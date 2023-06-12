@@ -47,6 +47,8 @@ from sanitize_filename import sanitize
 
 # to do: we need to make sure model's loose files are properly moved to the correct subdir, i.e. "images", "videos".
 # ive been using older scripts of mine to do this, but i want this to do everything, so this will be added soon
+# also, my history implementation is atrocious, and it's constantly reading and recreating the file, so that needs to be fixed
+# i want to store all history in memory, and then write it to file at the end, but i havent gotten around to it yet
 
 
 def get_config():

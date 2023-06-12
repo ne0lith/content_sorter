@@ -21,7 +21,7 @@ def get_config():
         "COMPLETION_JSON": Path("A:/Venus/collections.json"),
         "HISTORY_FILE": Path("A:/Venus/history/history.json"),
         "PREMIUM_DIR": "premium",
-        "IS_DRY_RUN": False,
+        "IS_DRY_RUN": True,
         "IS_DEBUG": False,
         "DO_RENAMES": True,
         "DO_REMOVE_DUPLICATE_EXTENSIONS": True,

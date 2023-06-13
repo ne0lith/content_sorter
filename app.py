@@ -18,7 +18,7 @@ from sanitize_filename import sanitize
 
 def get_config():
     config = {
-        "VERSION": "0.0.8",
+        "VERSION": "0.0.9",
         "AUTHOR": "ne0liberal",
         "ROOT_DIR": Path("A:/Venus/collections"),
         "COMPLETION_JSON": Path("A:/Venus/collections.json"),
@@ -505,7 +505,7 @@ class FileProcessor:
             file_path.rename(output_path)
 
             tqdm.write(f"Original: {file_path}")
-            tqdm.write(f"New: {output_path}")
+            tqdm.write(f"New: {output_path}\n")
 
             if file_path in self.images_to_convert:
                 self.images_to_convert.remove(file_path)
@@ -528,27 +528,27 @@ class FileProcessor:
 
                 if output_path.is_file() and output_path.stat().st_size > 0:
                     tqdm.write(f"Original: {file_path}")
-                    tqdm.write(f"New: {output_path}")
+                    tqdm.write(f"New: {output_path}\n")
                     file_path.unlink()
 
                     if file_path in self.images_to_convert:
                         self.images_to_convert.remove(file_path)
                 else:
                     tqdm.write(
-                        "Error occurred during conversion. Original file not deleted."
+                        "Error occurred during conversion. Original file not deleted.\n"
                     )
                     if output_path.is_file():
                         output_path.unlink()
             except Exception as e:
                 tqdm.write(
-                    "Error occurred during conversion. Original file not deleted."
+                    "Error occurred during conversion. Original file not deleted.\n"
                 )
-                tqdm.write(f"Error message: {str(e)}")
+                tqdm.write(f"Error message: {str(e)}\n")
                 if output_path.is_file():
                     output_path.unlink()
 
         else:
-            tqdm.write("File is not a PNG or JFIF.")
+            tqdm.write("File is not a PNG or JFIF.\n")
             self.images_to_convert.append(file_path)
 
     def get_model_name(self, file_path: Path) -> str:

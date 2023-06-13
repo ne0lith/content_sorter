@@ -1,5 +1,7 @@
 import os
 import re
+import sys
+import builtins
 import json
 import time
 import ftfy
@@ -18,7 +20,7 @@ from sanitize_filename import sanitize
 
 def get_config():
     config = {
-        "VERSION": "0.0.9",
+        "VERSION": "0.1.0",
         "AUTHOR": "ne0liberal",
         "ROOT_DIR": Path("A:/Venus/collections"),
         "COMPLETION_JSON": Path("A:/Venus/collections.json"),
@@ -85,6 +87,40 @@ def get_config():
     return config
 
 
+class CustomEnvironment:
+    def __init__(self):
+        self.original_print = builtins.print
+        self.original_input = builtins.input
+        self.original_write = tqdm.write
+
+        builtins.print = self.custom_print
+        builtins.input = self.custom_input
+        tqdm.write = self.custom_write
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.restore()
+
+    def custom_print(self, *args, **kwargs):
+        modified_args = ("    " + str(arg) for arg in args)
+        self.original_print(*modified_args, **kwargs)
+
+    def custom_input(self, prompt=""):
+        modified_prompt = "    " + prompt
+        return self.original_input(modified_prompt)
+
+    def custom_write(self, s, *args, **kwargs):
+        modified_s = "    " + s
+        self.original_write(modified_s, *args, **kwargs)
+
+    def restore(self):
+        builtins.print = self.original_print
+        builtins.input = self.original_input
+        tqdm.write = self.original_write
+
+
 class History:
     def __init__(self, history_file):
         self.history_file = history_file
@@ -138,18 +174,19 @@ class FileProcessor:
         self.images_to_convert = list()
         self.actions_history = list()
 
-        print(self.display_ascii_art())
-        print(f"\n    Version: {self.version}")
-        print(f"     Author: {self.author}\n\n")
+        print("\n" + self.display_ascii_art() + "\n")
+        print(f"Version: {self.version}")
+        print(f" Author: {self.author}\n\n")
 
     def crawl_root(self):
         start_time = time.time()
 
+        sys.stdout.write("\033[?25l")
         self.progress_bar = tqdm(
-            desc=f'Crawling "{self.root_dir}"',
+            desc=f'    Crawling "{self.root_dir}"',
             unit=" files",
             leave=False,
-            bar_format="{l_bar} {n_fmt} {unit} ({rate_fmt}) [{elapsed}]",
+            bar_format="{l_bar} {n_fmt}{unit} ({rate_fmt}) [{elapsed}]",
         )
 
         pool = Pool(processes=self.num_processes)
@@ -157,6 +194,7 @@ class FileProcessor:
             partial_process_file = partial(self.process_file)
             self.process_directory(self.root_dir, partial_process_file)
         self.progress_bar.close()
+        sys.stdout.write("\033[?25h")
 
         self.history_instance.save_history()
         self.export_dict(str(self.completion_json), self.result_dict)
@@ -166,28 +204,30 @@ class FileProcessor:
 
         total_actions = len(self.actions_history)
 
+        print("-----------------------------------\n\n")
         if total_actions == 0:
-            print(f"\nTotal files checked: {self.file_count}")
-            print(f"Total time: {total_time:.2f} seconds")
-            print("No actions necessary!\n")
-        else:
-            print("-----------------------------------\n")
-            print(f"Total time: {total_time:.2f} seconds")
-            print(f"Total files: {total_files}\n")
+            print(f"Total files checked: {self.file_count}")
+        print(f"Total time: {total_time:.2f} seconds")
+        print(f"Total files: {total_files}\n")
 
         if self.videos_to_convert:
-            print(f"Total remnant videos to convert: {len(self.videos_to_convert)}")
-            print("\nVideos to convert:")
+            amnt = f"Videos to convert: ({len(self.videos_to_convert)})"
+            print(amnt)
+            print("-" * len(amnt) + "\n")
             for video in self.videos_to_convert:
                 print(str(video))
 
         if self.images_to_convert:
-            print(f"Total remnant images to convert: {len(self.images_to_convert)}")
-            print("\nImages to convert:")
+            if self.videos_to_convert:
+                print()
+            amnt = f"Images to convert: ({len(self.images_to_convert)})"
+            print(amnt)
+            print("-" * len(amnt) + "\n")
             for image in self.images_to_convert:
                 print(str(image))
 
-        input("\nPress any key to exit...")
+        print()
+        input("Press any key to exit...")
 
     def process_file(self, file_path):
         key = str(file_path.relative_to(self.root_dir).parts[0])
@@ -213,6 +253,24 @@ class FileProcessor:
                 and file_path.suffix.lower() not in self.goal_video_extension
             ):
                 self.videos_to_convert.append(file_path)
+
+            if self.do_converts:
+                if self.do_image_converts:
+                    if file_path in self.images_to_convert:
+                        if not self.is_dry_run:
+                            try:
+                                self.convert_to_jpg(file_path)
+                                if file_path in self.images_to_convert:
+                                    self.images_to_convert.remove(file_path)
+                                self.actions_history.append(
+                                    file_path.with_suffix(".jpg")
+                                )
+                            except Exception as e:
+                                tqdm.write(f"Error: {e}")
+                                self.actions_history.append(file_path)
+                        else:
+                            tqdm.write(f"Would convert {file_path}")
+                            self.actions_history.append(file_path)
 
             if self.do_imports:
                 import_conditions = [
@@ -275,25 +333,6 @@ class FileProcessor:
                                     f"\nWould rename {filename_original} to {filename_new}"
                                 )
                                 self.actions_history.append(filename_original)
-
-            if self.do_converts:
-                if self.do_image_converts:
-                    if file_path.exists():
-                        if file_path in self.images_to_convert:
-                            if not self.is_dry_run:
-                                try:
-                                    self.convert_to_jpg(file_path)
-                                    if file_path in self.images_to_convert:
-                                        self.images_to_convert.remove(file_path)
-                                    self.actions_history.append(
-                                        file_path.with_suffix(".jpg")
-                                    )
-                                except Exception as e:
-                                    tqdm.write(f"Error: {e}")
-                                    self.actions_history.append(file_path)
-                            else:
-                                tqdm.write(f"Would convert {file_path}")
-                                self.actions_history.append(file_path)
 
             if self.do_imports:
                 if self.do_loose_file_imports:
@@ -505,7 +544,7 @@ class FileProcessor:
             file_path.rename(output_path)
 
             tqdm.write(f"Original: {file_path}")
-            tqdm.write(f"New: {output_path}\n")
+            tqdm.write(f"     New: {output_path}\n")
 
             if file_path in self.images_to_convert:
                 self.images_to_convert.remove(file_path)
@@ -528,7 +567,7 @@ class FileProcessor:
 
                 if output_path.is_file() and output_path.stat().st_size > 0:
                     tqdm.write(f"Original: {file_path}")
-                    tqdm.write(f"New: {output_path}\n")
+                    tqdm.write(f"     New: {output_path}\n")
                     file_path.unlink()
 
                     if file_path in self.images_to_convert:
@@ -622,7 +661,7 @@ class FileProcessor:
                 tqdm.write("Status: Dry run")
 
             tqdm.write(f"Original: {input_path}")
-            tqdm.write(f"New:      {output_path}\n")
+            tqdm.write(f"     New: {output_path}\n")
 
         except FileExistsError:
             input_size = input_path.stat().st_size
@@ -675,8 +714,9 @@ class FileProcessor:
 
 def main():
     os.system("cls")
-    processor = FileProcessor(num_processes=10)
-    processor.crawl_root()
+    with CustomEnvironment():
+        processor = FileProcessor(num_processes=10)
+        processor.crawl_root()
 
 
 if __name__ == "__main__":

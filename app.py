@@ -18,6 +18,8 @@ from sanitize_filename import sanitize
 
 def get_config():
     config = {
+        "VERSION": "0.0.8",
+        "AUTHOR": "ne0liberal",
         "ROOT_DIR": Path("A:/Venus/collections"),
         "COMPLETION_JSON": Path("A:/Venus/collections.json"),
         "HISTORY_FILE": Path("A:/Venus/history/history.json"),
@@ -66,6 +68,7 @@ def get_config():
             "jessica nigri - fix",
             "meg turney",
             "meg turney - fix",
+            "virtual reality (vr)",
         ],
         "PROTECTED_DIRS": [
             "corrupted",
@@ -128,17 +131,26 @@ class FileProcessor:
 
         self.progress_bar = None
         self.file_count = 0
-        self.update_interval = 750
+        self.update_interval = 850
 
         self.result_dict = dict()
         self.videos_to_convert = list()
         self.images_to_convert = list()
         self.actions_history = list()
 
+        print(self.display_ascii_art())
+        print(f"\n    Version: {self.version}")
+        print(f"     Author: {self.author}\n\n")
+
     def crawl_root(self):
         start_time = time.time()
 
-        self.progress_bar = tqdm(desc="Crawling", unit=" files", leave=False)
+        self.progress_bar = tqdm(
+            desc=f'Crawling "{self.root_dir}"',
+            unit=" files",
+            leave=False,
+            bar_format="{l_bar} {n_fmt} {unit} ({rate_fmt}) [{elapsed}]",
+        )
 
         pool = Pool(processes=self.num_processes)
         with pool:
@@ -231,8 +243,7 @@ class FileProcessor:
                             self.rename_file(input_path, output_path)
                             self.actions_history.append(output_path)
                         else:
-                            print(f"\nWould move {input_path} to {output_path}")
-                            self.actions_history.append(input_path)
+                            tqdm.write(f"Would move {input_path} to {output_path}")
 
             if self.do_renames:
                 if self.do_remove_duplicate_extensions:
@@ -246,8 +257,8 @@ class FileProcessor:
                                     self.rename_file(file_path, new_file_path)
                                     self.actions_history.append(new_file_path)
                                 else:
-                                    print(
-                                        f"\nWould rename {file_path} to {new_file_path}"
+                                    tqdm.write(
+                                        f"Would rename {file_path} to {new_file_path}"
                                     )
                                     self.actions_history.append(file_path)
 
@@ -260,7 +271,7 @@ class FileProcessor:
                                 self.rename_file(filename_original, filename_new)
                                 self.actions_history.append(filename_new)
                             else:
-                                print(
+                                tqdm.write(
                                     f"\nWould rename {filename_original} to {filename_new}"
                                 )
                                 self.actions_history.append(filename_original)
@@ -278,10 +289,10 @@ class FileProcessor:
                                         file_path.with_suffix(".jpg")
                                     )
                                 except Exception as e:
-                                    print(f"Error: {e}")
+                                    tqdm.write(f"Error: {e}")
                                     self.actions_history.append(file_path)
                             else:
-                                print(f"Would convert {file_path}")
+                                tqdm.write(f"Would convert {file_path}")
                                 self.actions_history.append(file_path)
 
             if self.do_imports:
@@ -312,7 +323,7 @@ class FileProcessor:
                                     subdir_path.mkdir()
                                     self.actions_history.append(subdir_path)
                                 else:
-                                    print(f"\nWould create {subdir_path}")
+                                    tqdm.write(f"Would create {subdir_path}")
 
                             input_path = file_path
                             output_path = subdir_path / file_path.name
@@ -322,7 +333,9 @@ class FileProcessor:
                                 self.rename_file(input_path, output_path)
                                 self.actions_history.append(output_path)
                             else:
-                                print(f"\nWould move {input_path} to {output_path}")
+                                tqdm.write(
+                                    f"\nWould move {input_path} to {output_path}"
+                                )
 
             self.file_count += 1
 
@@ -334,6 +347,8 @@ class FileProcessor:
             exclude_dirs = self.protected_dirs
             exclude_dirs += [self.root_dir / dir for dir in self.protected_models]
 
+        # i believe this is a huge inefficiency
+        # but don't know enough to figure out a better way
         for entry in os.scandir(dir_path):
             if entry.is_dir():
                 skip_directory = False
@@ -346,7 +361,7 @@ class FileProcessor:
 
                 if skip_directory:
                     if self.is_debug:
-                        print(f"\nSkipping {entry.path}")
+                        tqdm.write(f"Skipping {entry.path}")
                     continue
 
                 self.process_directory(entry.path, partial_func, exclude_dirs)
@@ -355,7 +370,7 @@ class FileProcessor:
 
     def validate_path(self, path: Path, expect=None):
         if expect not in ["file", "dir"]:
-            print(f"Invalid expect value: {expect}. Must be 'file' or 'dir'")
+            tqdm.write(f"Invalid expect value: {expect}. Must be 'file' or 'dir'")
             return False
 
         if not path.exists():
@@ -489,8 +504,8 @@ class FileProcessor:
 
             file_path.rename(output_path)
 
-            print(f"\nOriginal: {file_path}")
-            print(f"New: {output_path}")
+            tqdm.write(f"Original: {file_path}")
+            tqdm.write(f"New: {output_path}")
 
             if file_path in self.images_to_convert:
                 self.images_to_convert.remove(file_path)
@@ -501,7 +516,6 @@ class FileProcessor:
             try:
                 image = Image.open(file_path)
 
-                # Convert RGBA to RGB if image mode is RGBA
                 if image.mode == "RGBA":
                     image = image.convert("RGB")
 
@@ -513,26 +527,28 @@ class FileProcessor:
                     self.images_to_convert.remove(file_path)
 
                 if output_path.is_file() and output_path.stat().st_size > 0:
-                    print(f"\nOriginal: {file_path}")
-                    print(f"New: {output_path}")
+                    tqdm.write(f"Original: {file_path}")
+                    tqdm.write(f"New: {output_path}")
                     file_path.unlink()
 
                     if file_path in self.images_to_convert:
                         self.images_to_convert.remove(file_path)
                 else:
-                    print(
+                    tqdm.write(
                         "Error occurred during conversion. Original file not deleted."
                     )
                     if output_path.is_file():
                         output_path.unlink()
             except Exception as e:
-                print("Error occurred during conversion. Original file not deleted.")
-                print(f"Error message: {str(e)}")
+                tqdm.write(
+                    "Error occurred during conversion. Original file not deleted."
+                )
+                tqdm.write(f"Error message: {str(e)}")
                 if output_path.is_file():
                     output_path.unlink()
 
         else:
-            print("File is not a PNG or JFIF.")
+            tqdm.write("File is not a PNG or JFIF.")
             self.images_to_convert.append(file_path)
 
     def get_model_name(self, file_path: Path) -> str:
@@ -592,11 +608,10 @@ class FileProcessor:
         return sanitized_filename
 
     def rename_file(self, input_path: Path, output_path: Path):
-        # lowercase the output path filename
         output_path = output_path.parent / output_path.name.lower()
 
         if not self.validate_path(input_path, expect="file"):
-            print(f"Invalid file path: {input_path}")
+            tqdm.write(f"Invalid file path: {input_path}\n")
             return
 
         try:
@@ -604,10 +619,10 @@ class FileProcessor:
                 input_path.rename(output_path)
                 self.history_instance.append_to_history(input_path, output_path)
             else:
-                print("\nStatus: Dry run")
+                tqdm.write("Status: Dry run")
 
-            print(f"\nOriginal: {input_path}")
-            print(f"New:      {output_path}")
+            tqdm.write(f"Original: {input_path}")
+            tqdm.write(f"New:      {output_path}\n")
 
         except FileExistsError:
             input_size = input_path.stat().st_size
@@ -626,7 +641,7 @@ class FileProcessor:
 
         except Exception as e:
             traceback.print_exc()
-            print(f"Could not rename {input_path}: {e}")
+            tqdm.write(f"Could not rename {input_path}: {e}\n")
             input("Press enter to continue...")
 
     def export_dict(self, output_path: Path, result_dict=None):
@@ -637,6 +652,25 @@ class FileProcessor:
                 indent=4,
                 default=lambda x: x.decode() if isinstance(x, bytes) else x,
             )
+
+    def display_ascii_art(self):
+        ascii_art = """
+    :::     ::: :::::::::: ::::    ::: :::    :::  ::::::::  
+    :+:     :+: :+:        :+:+:   :+: :+:    :+: :+:    :+: 
+    +:+     +:+ +:+        :+:+:+  +:+ +:+    +:+ +:+        
+    +#+     +:+ +#++:++#   +#+ +:+ +#+ +#+    +:+ +#++:++#++ 
+    +#+   +#+  +#+        +#+  +#+#+# +#+    +#+        +#+ 
+    #+#+#+#+#+   #+#        #+#   #+#+# #+#    #+# #+#    #+# 
+        ###     ########## ###    ####  ########   ########  
+    :::::::::::: ::::    ::::  :::::::::   ::::::::  :::::::::  ::::::::::: :::::::::: :::::::::  
+        :+:     +:+:+: :+:+:+ :+:    :+: :+:    :+: :+:    :+:     :+:     :+:        :+:    :+: 
+        +:+     +:+ +:+:+ +:+ +:+    +:+ +:+    +:+ +:+    +:+     +:+     +:+        +:+    +:+ 
+        +#+     +#+  +:+  +#+ +#++:++#+  +#+    +:+ +#++:++#:      +#+     +#++:++#   +#++:++#:  
+        +#+     +#+       +#+ +#+        +#+    +#+ +#+    +#+     +#+     +#+        +#+    +#+ 
+        #+#     #+#       #+# #+#        #+#    #+# #+#    #+#     #+#     #+#        #+#    #+# 
+    ########### ###       ### ###         ########  ###    ###     ###     ########## ###    ###
+    """
+        return ascii_art
 
 
 def main():

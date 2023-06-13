@@ -6,9 +6,10 @@ import ftfy
 import emoji
 import shutil
 import traceback
+import uuid
+import datetime
 from tqdm import tqdm
 from PIL import Image
-from datetime import datetime
 from pathlib import Path
 from functools import partial
 from multiprocessing import Pool
@@ -23,7 +24,7 @@ def get_config():
         "PREMIUM_DIR": "premium",
         "IS_DRY_RUN": False,
         "IS_DEBUG": False,
-        "DO_IMPORTS": False,
+        "DO_IMPORTS": True,
         "DO_RENAMES": True,
         "DO_CONVERTS": True,
         "DO_SANITIZE_FILENAMES": True,
@@ -60,11 +61,11 @@ def get_config():
         "PROTECTED_MODELS": [
             "darshelle stevens",
             "darshelle stevens - fix",
+            "darshelle - jessica - meg crossovers",
             "jessica nigri",
             "jessica nigri - fix",
             "meg turney",
             "meg turney - fix",
-            "darshelle - jessica - meg crossovers",
         ],
         "PROTECTED_DIRS": [
             "corrupted",
@@ -78,11 +79,42 @@ def get_config():
         ],
     }
 
-    history_file = config["HISTORY_FILE"]
-    if not history_file.exists():
-        history_file.touch()
-
     return config
+
+
+class History:
+    def __init__(self, history_file):
+        self.history_file = history_file
+        self.history = self.load_history()
+
+    def append_to_history(self, input_path, output_path):
+        timestamp = datetime.datetime.now().timestamp()
+        identifier = uuid.uuid4()
+
+        entry = {
+            "input_path": str(input_path),
+            "output_path": str(output_path),
+            "timestamp": str(timestamp),
+        }
+
+        self.history[str(identifier)] = entry
+
+    def load_history(self):
+        if self.history_file.exists():
+            with open(self.history_file, "r") as f:
+                file_content = f.read()
+                if file_content:
+                    return json.loads(file_content)
+        return dict()
+
+    def save_history(self):
+        self.backup_history()
+        with open(self.history_file, "w") as f:
+            json.dump(self.history, f, indent=4)
+
+    def backup_history(self):
+        if self.history_file.exists():
+            shutil.copy(self.history_file, self.history_file.with_suffix(".bak"))
 
 
 class FileProcessor:
@@ -92,6 +124,7 @@ class FileProcessor:
         self.config = get_config()
         for key in self.config.keys():
             setattr(self, key.lower(), self.config[key])
+        self.history_instance = History(self.history_file)
 
         self.progress_bar = None
         self.file_count = 0
@@ -113,6 +146,7 @@ class FileProcessor:
             self.process_directory(self.root_dir, partial_process_file)
         self.progress_bar.close()
 
+        self.history_instance.save_history()
         self.export_dict(str(self.completion_json), self.result_dict)
 
         total_time = time.time() - start_time
@@ -238,7 +272,8 @@ class FileProcessor:
                             if not self.is_dry_run:
                                 try:
                                     self.convert_to_jpg(file_path)
-                                    self.images_to_convert.remove(file_path)
+                                    if file_path in self.images_to_convert:
+                                        self.images_to_convert.remove(file_path)
                                     self.actions_history.append(
                                         file_path.with_suffix(".jpg")
                                     )
@@ -556,46 +591,10 @@ class FileProcessor:
 
         return sanitized_filename
 
-    def _write_history(self, input_path: Path, output_path: Path):
-        if not self.history_file.exists():
-            self.history_file.touch(exist_ok=True)
-
-        history_entry = {
-            "input_path": str(input_path),
-            "output_path": str(output_path),
-            "timestamp": datetime.now().isoformat(),
-        }
-
-        history_dict = self._load_history()
-
-        history_dict[history_entry["timestamp"]] = (
-            str(input_path),
-            str(output_path),
-        )
-
-        with open(self.history_file, "w") as history_file:
-            json.dump(history_dict, history_file)
-
-        self._backup_history()
-
-    def _load_history(self):
-        if not self.history_file.exists() or self.history_file.stat().st_size == 0:
-            return {}
-
-        self._backup_history()
-
-        with open(self.history_file, "r") as history_file:
-            return json.load(history_file)
-
-    def _backup_history(self):
-        backup_file = self.history_file.with_suffix(self.history_file.suffix + ".bak")
-
-        if backup_file.exists():
-            backup_file.unlink()
-
-        shutil.copy2(self.history_file, backup_file)
-
     def rename_file(self, input_path: Path, output_path: Path):
+        # lowercase the output path filename
+        output_path = output_path.parent / output_path.name.lower()
+
         if not self.validate_path(input_path, expect="file"):
             print(f"Invalid file path: {input_path}")
             return
@@ -603,7 +602,7 @@ class FileProcessor:
         try:
             if not self.is_dry_run:
                 input_path.rename(output_path)
-                self._write_history(input_path, output_path)
+                self.history_instance.append_to_history(input_path, output_path)
             else:
                 print("\nStatus: Dry run")
 

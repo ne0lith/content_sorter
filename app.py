@@ -21,11 +21,13 @@ def get_config():
         "COMPLETION_JSON": Path("A:/Venus/collections.json"),
         "HISTORY_FILE": Path("A:/Venus/history/history.json"),
         "PREMIUM_DIR": "premium",
-        "IS_DRY_RUN": True,
+        "IS_DRY_RUN": False,
         "IS_DEBUG": False,
+        "DO_IMPORTS": False,
         "DO_RENAMES": True,
-        "DO_REMOVE_DUPLICATE_EXTENSIONS": True,
         "DO_CONVERTS": True,
+        "DO_SANITIZE_FILENAMES": True,
+        "DO_REMOVE_DUPLICATE_EXTENSIONS": True,
         "DO_COOMER_IMPORTS": True,
         "DO_ONLYFANS_IMPORTS": True,
         "DO_FANSLY_IMPORTS": True,
@@ -37,8 +39,7 @@ def get_config():
             "audio": [".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg"],
             "images": [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp", ".jfif"],
             "text": [".txt", ".doc", ".docx", ".pdf", ".rtf", ".xls", ".xlsx"],
-            "heic": [".heic"],
-            "torrent": [".torrent"],
+            "misc": [".zip", ".rar", ".7z", ".torrent", ".heic"],
             "videos": [
                 ".mp4",
                 ".mkv",
@@ -94,7 +95,7 @@ class FileProcessor:
 
         self.progress_bar = None
         self.file_count = 0
-        self.update_interval = 1350
+        self.update_interval = 750
 
         self.result_dict = dict()
         self.videos_to_convert = list()
@@ -167,158 +168,126 @@ class FileProcessor:
             ):
                 self.videos_to_convert.append(file_path)
 
-            if self.do_coomer_imports:
-                if self.is_coomer_file(file_path):
-                    model_premium_dir = self.get_model_premium_dir(file_path)
-                    if not model_premium_dir.exists():
-                        model_premium_dir.mkdir()
+            if self.do_imports:
+                import_conditions = [
+                    (self.do_coomer_imports, self.is_coomer_file),
+                    (self.do_onlyfans_imports, self.is_onlyfans_file),
+                    (self.do_fansly_imports, self.is_fansly_file),
+                    (self.do_patreon_imports, self.is_patreon_file),
+                    (self.do_ppv_imports, self.is_ppv_file),
+                ]
 
-                    input_path = file_path
-                    output_path = model_premium_dir / file_path.name
+                for import_flag, import_checker in import_conditions:
+                    if not import_flag:
+                        continue
 
-                    # no other file *should* share the same name
-                    # so i think we can safely delete the smaller file
-                    # something we cant do with onlyfans files
-                    # because sometimes leakers will rename files
-                    if output_path.exists():
-                        input_size = input_path.stat().st_size
-                        output_size = output_path.stat().st_size
+                    if import_flag and not import_checker(file_path):
+                        continue
 
-                        if input_size > output_size:
-                            smallest_file = output_path
-                        elif input_size < output_size:
-                            smallest_file = input_path
-                        else:
-                            smallest_file = output_path
+                    if import_flag and import_checker(file_path):
+                        model_premium_dir = self.get_model_premium_dir(file_path)
+                        if not model_premium_dir.exists():
+                            model_premium_dir.mkdir()
+
+                        input_path = file_path
+                        output_path = model_premium_dir / file_path.name
+                        output_path = self.get_unique_file_path(output_path)
 
                         if not self.is_dry_run:
-                            print(f"Deleting {smallest_file}")
-                            smallest_file.unlink()
+                            self.rename_file(input_path, output_path)
+                            self.actions_history.append(output_path)
                         else:
-                            print(f"Would delete {smallest_file}")
-
-                        if not input_path.exists():
-                            return
-
-                    try:
-                        output_filename = self.get_unique_file_path(
-                            model_premium_dir / file_path.name
-                        )
-                        self.rename_file(file_path, output_filename)
-                        self.actions_history.append(output_filename)
-                    except Exception as e:
-                        print(f"Error: {e}")
-                        self.actions_history.append(output_filename)
-
-            if self.do_onlyfans_imports:
-                if self.is_onlyfans_file(file_path):
-                    model_premium_dir = self.get_model_premium_dir(file_path)
-                    if not model_premium_dir.exists():
-                        model_premium_dir.mkdir()
-
-                    input_path = file_path
-                    output_path = model_premium_dir / file_path.name
-
-                    output_path = self.get_unique_file_path(output_path)
-
-                    if not self.is_dry_run:
-                        self.rename_file(input_path, output_path)
-                        self.actions_history.append(output_path)
-                    else:
-                        print(f"\nWould move {input_path} to {output_path}")
-                        self.actions_history.append(input_path)
-
-            if self.do_fansly_imports:
-                if self.is_fansly_file(file_path):
-                    model_premium_dir = self.get_model_premium_dir(file_path)
-                    if not model_premium_dir.exists():
-                        model_premium_dir.mkdir()
-
-                    input_path = file_path
-                    output_path = model_premium_dir / file_path.name
-
-                    output_path = self.get_unique_file_path(output_path)
-
-                    if not self.is_dry_run:
-                        self.rename_file(input_path, output_path)
-                        self.actions_history.append(output_path)
-                    else:
-                        print(f"\nWould move {input_path} to {output_path}")
-                        self.actions_history.append(input_path)
-
-            if self.do_patreon_imports:
-                if self.is_patreon_file(file_path):
-                    model_premium_dir = self.get_model_premium_dir(file_path)
-                    if not model_premium_dir.exists():
-                        model_premium_dir.mkdir()
-
-                    input_path = file_path
-                    output_path = model_premium_dir / file_path.name
-
-                    output_path = self.get_unique_file_path(output_path)
-
-                    if not self.is_dry_run:
-                        self.rename_file(input_path, output_path)
-                        self.actions_history.append(output_path)
-                    else:
-                        print(f"\nWould move {input_path} to {output_path}")
-                        self.actions_history.append(input_path)
-
-            if self.do_ppv_imports:
-                if self.is_ppv_file(file_path):
-                    model_premium_dir = self.get_model_premium_dir(file_path)
-                    if not model_premium_dir.exists():
-                        model_premium_dir.mkdir()
-
-                    input_path = file_path
-                    output_path = model_premium_dir / file_path.name
-
-                    output_path = self.get_unique_file_path(output_path)
-
-                    if not self.is_dry_run:
-                        self.rename_file(input_path, output_path)
-                        self.actions_history.append(output_path)
-                    else:
-                        print(f"\nWould move {input_path} to {output_path}")
-                        self.actions_history.append(input_path)
-
-            if self.do_remove_duplicate_extensions:
-                if self.has_duplicate_extensions(file_path):
-                    new_filename = self.remove_duped_extensions(file_path.name)
-                    new_file_path = file_path.parent / new_filename
-
-                    if new_file_path != file_path:
-                        if not self.is_dry_run:
-                            self.rename_file(file_path, new_file_path)
-                            self.actions_history.append(new_file_path)
-                        else:
-                            print(f"\nWould rename {file_path} to {new_file_path}")
-                            self.actions_history.append(file_path)
+                            print(f"\nWould move {input_path} to {output_path}")
+                            self.actions_history.append(input_path)
 
             if self.do_renames:
-                filename_original = file_path
-                filename_new = self.sanitize_filename(file_path)
-                if filename_original != filename_new:
-                    if not self.is_dry_run:
-                        self.rename_file(filename_original, filename_new)
-                        self.actions_history.append(filename_new)
-                    else:
-                        print(f"\nWould rename {filename_original} to {filename_new}")
-                        self.actions_history.append(filename_original)
+                if self.do_remove_duplicate_extensions:
+                    if file_path.exists():
+                        if self.has_duplicate_extensions(file_path):
+                            new_filename = self.remove_duped_extensions(file_path.name)
+                            new_file_path = file_path.parent / new_filename
 
-            if self.do_image_converts:
-                if file_path in self.images_to_convert:
-                    if not self.is_dry_run:
-                        try:
-                            self.convert_to_jpg(file_path)
-                            self.images_to_convert.remove(file_path)
-                            self.actions_history.append(file_path.with_suffix(".jpg"))
-                        except Exception as e:
-                            print(f"Error: {e}")
-                            self.actions_history.append(file_path)
-                    else:
-                        print(f"Would convert {file_path}")
-                        self.actions_history.append(file_path)
+                            if new_file_path != file_path:
+                                if not self.is_dry_run:
+                                    self.rename_file(file_path, new_file_path)
+                                    self.actions_history.append(new_file_path)
+                                else:
+                                    print(
+                                        f"\nWould rename {file_path} to {new_file_path}"
+                                    )
+                                    self.actions_history.append(file_path)
+
+                if self.do_sanitize_filenames:
+                    if file_path.exists():
+                        filename_original = file_path
+                        filename_new = self.sanitize_filename(file_path)
+                        if filename_original != filename_new:
+                            if not self.is_dry_run:
+                                self.rename_file(filename_original, filename_new)
+                                self.actions_history.append(filename_new)
+                            else:
+                                print(
+                                    f"\nWould rename {filename_original} to {filename_new}"
+                                )
+                                self.actions_history.append(filename_original)
+
+            if self.do_converts:
+                if self.do_image_converts:
+                    if file_path.exists():
+                        if file_path in self.images_to_convert:
+                            if not self.is_dry_run:
+                                try:
+                                    self.convert_to_jpg(file_path)
+                                    self.images_to_convert.remove(file_path)
+                                    self.actions_history.append(
+                                        file_path.with_suffix(".jpg")
+                                    )
+                                except Exception as e:
+                                    print(f"Error: {e}")
+                                    self.actions_history.append(file_path)
+                            else:
+                                print(f"Would convert {file_path}")
+                                self.actions_history.append(file_path)
+
+            if self.do_imports:
+                if self.do_loose_file_imports:
+                    if file_path.exists():
+                        model_dir = self.get_model_name(file_path)
+                        model_dir = self.root_dir / model_dir
+
+                        if model_dir == file_path.parent and any(
+                            file_path.suffix in filetypes
+                            for filetypes in self.valid_filetypes.values()
+                        ):
+                            file_extension = file_path.suffix
+                            subfolder = None
+
+                            for key, filetypes in self.valid_filetypes.items():
+                                if file_extension in filetypes:
+                                    subfolder = key
+                                    break
+
+                            if subfolder is None:
+                                subfolder = "misc"
+
+                            subdir_path = model_dir / subfolder
+
+                            if not subdir_path.exists():
+                                if not self.is_dry_run:
+                                    subdir_path.mkdir()
+                                    self.actions_history.append(subdir_path)
+                                else:
+                                    print(f"\nWould create {subdir_path}")
+
+                            input_path = file_path
+                            output_path = subdir_path / file_path.name
+
+                            if not self.is_dry_run:
+                                output_path = self.get_unique_file_path(output_path)
+                                self.rename_file(input_path, output_path)
+                                self.actions_history.append(output_path)
+                            else:
+                                print(f"\nWould move {input_path} to {output_path}")
 
             self.file_count += 1
 
@@ -482,9 +451,15 @@ class FileProcessor:
         if "jpeg" in file_path.suffix.lower():
             output_path = file_path.with_suffix(".jpg")
             output_path = self.get_unique_file_path(output_path)
+
             file_path.rename(output_path)
+
             print(f"\nOriginal: {file_path}")
             print(f"New: {output_path}")
+
+            if file_path in self.images_to_convert:
+                self.images_to_convert.remove(file_path)
+
             return
 
         if file_path.suffix.lower() in [".png", ".jfif"]:
@@ -499,10 +474,16 @@ class FileProcessor:
                 output_path = self.get_unique_file_path(output_path)
                 image.save(output_path, "JPEG", quality=100)
 
+                if file_path in self.images_to_convert:
+                    self.images_to_convert.remove(file_path)
+
                 if output_path.is_file() and output_path.stat().st_size > 0:
                     print(f"\nOriginal: {file_path}")
                     print(f"New: {output_path}")
                     file_path.unlink()
+
+                    if file_path in self.images_to_convert:
+                        self.images_to_convert.remove(file_path)
                 else:
                     print(
                         "Error occurred during conversion. Original file not deleted."
@@ -519,13 +500,13 @@ class FileProcessor:
             print("File is not a PNG or JFIF.")
             self.images_to_convert.append(file_path)
 
-    def get_model(self, file_path: Path) -> str:
+    def get_model_name(self, file_path: Path) -> str:
         file_model = file_path.parts[file_path.parts.index("collections") + 1]
 
         return file_model
 
     def get_model_premium_dir(self, file_path: Path) -> Path:
-        file_model = self.get_model(file_path)
+        file_model = self.get_model_name(file_path)
         model_premium_dir = self.root_dir / file_model / self.premium_dir
         return model_premium_dir
 

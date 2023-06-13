@@ -20,7 +20,7 @@ from sanitize_filename import sanitize
 
 def get_config():
     config = {
-        "VERSION": "0.1.0",
+        "VERSION": "0.1.1",
         "AUTHOR": "ne0liberal",
         "ROOT_DIR": Path("A:/Venus/collections"),
         "COMPLETION_JSON": Path("A:/Venus/collections.json"),
@@ -208,12 +208,18 @@ class FileProcessor:
         if total_actions == 0:
             print(f"Total files checked: {self.file_count}")
         print(f"Total time: {total_time:.2f} seconds")
-        print(f"Total files: {total_files}\n")
+        print(f"Total files: {total_files}\n\n")
+
+        # patch until im better at tracking actions
+        self.videos_to_convert, self.images_to_convert = [
+            list(filter(lambda item: item.exists(), lst))
+            for lst in (self.videos_to_convert, self.images_to_convert)
+        ]
 
         if self.videos_to_convert:
             amnt = f"Videos to convert: ({len(self.videos_to_convert)})"
             print(amnt)
-            print("-" * len(amnt) + "\n")
+            print("-" * len(amnt))
             for video in self.videos_to_convert:
                 print(str(video))
 
@@ -222,7 +228,7 @@ class FileProcessor:
                 print()
             amnt = f"Images to convert: ({len(self.images_to_convert)})"
             print(amnt)
-            print("-" * len(amnt) + "\n")
+            print("-" * len(amnt))
             for image in self.images_to_convert:
                 print(str(image))
 
@@ -240,6 +246,11 @@ class FileProcessor:
             self.result_dict[key].append(value)
         else:
             self.result_dict[key] = [value]
+
+        self.file_count += 1
+
+        if self.file_count % self.update_interval == 0:
+            self.progress_bar.update(self.update_interval)
 
         if not self.check_protected(file_path):
             if (
@@ -273,35 +284,20 @@ class FileProcessor:
                             self.actions_history.append(file_path)
 
             if self.do_imports:
-                import_conditions = [
-                    (self.do_coomer_imports, self.is_coomer_file),
-                    (self.do_onlyfans_imports, self.is_onlyfans_file),
-                    (self.do_fansly_imports, self.is_fansly_file),
-                    (self.do_patreon_imports, self.is_patreon_file),
-                    (self.do_ppv_imports, self.is_ppv_file),
-                ]
+                if self.is_premium_file(file_path):
+                    model_premium_dir = self.get_model_premium_dir(file_path)
+                    if not model_premium_dir.exists():
+                        model_premium_dir.mkdir()
 
-                for import_flag, import_checker in import_conditions:
-                    if not import_flag:
-                        continue
+                    input_path = file_path
+                    output_path = model_premium_dir / file_path.name
+                    output_path = self.get_unique_file_path(output_path)
 
-                    if import_flag and not import_checker(file_path):
-                        continue
-
-                    if import_flag and import_checker(file_path):
-                        model_premium_dir = self.get_model_premium_dir(file_path)
-                        if not model_premium_dir.exists():
-                            model_premium_dir.mkdir()
-
-                        input_path = file_path
-                        output_path = model_premium_dir / file_path.name
-                        output_path = self.get_unique_file_path(output_path)
-
-                        if not self.is_dry_run:
-                            self.rename_file(input_path, output_path)
-                            self.actions_history.append(output_path)
-                        else:
-                            tqdm.write(f"Would move {input_path} to {output_path}")
+                    if not self.is_dry_run:
+                        self.rename_file(input_path, output_path)
+                        self.actions_history.append(output_path)
+                    else:
+                        tqdm.write(f"Would move {input_path} to {output_path}")
 
             if self.do_renames:
                 if self.do_remove_duplicate_extensions:
@@ -375,11 +371,6 @@ class FileProcessor:
                                 tqdm.write(
                                     f"\nWould move {input_path} to {output_path}"
                                 )
-
-            self.file_count += 1
-
-            if self.file_count % self.update_interval == 0:
-                self.progress_bar.update(self.update_interval)
 
     def process_directory(self, dir_path, partial_func, exclude_dirs=None):
         if exclude_dirs is None:
@@ -473,48 +464,48 @@ class FileProcessor:
 
         return new_file_name
 
-    def is_coomer_file(self, file_path: Path):
-        pattern = r"^[a-fA-F0-9]{64}$"
+    def is_premium_file(self, file_path: Path):
+        def is_coomer_file(file_path):
+            pattern = r"^[a-fA-F0-9]{64}$"
+            return bool(re.match(pattern, file_path.stem))
 
-        if re.match(pattern, file_path.stem):
-            return True
-        return False
+        def is_onlyfans_file(file_path):
+            def is_image(file_path):
+                pattern = r"\d+x\d+_[a-z0-9]{32}"
+                return (
+                    re.search(pattern, file_path.stem)
+                    and file_path.suffix.lower() in self.valid_filetypes["images"]
+                )
 
-    def is_onlyfans_file(self, file_path: Path):
-        def is_image(file_path):
-            pattern = r"\d+x\d+_[a-z0-9]{32}"
+            def is_video(file_path):
+                pattern = r"[a-z0-9]{21}_source"
+                return (
+                    re.search(pattern, file_path.stem)
+                    and file_path.suffix.lower() in self.valid_filetypes["videos"]
+                )
+
             return (
-                re.search(pattern, file_path.stem)
-                and file_path.suffix.lower() in self.valid_filetypes["images"]
+                is_image(file_path)
+                or is_video(file_path)
+                or "onlyfans" in file_path.stem.lower()
             )
 
-        def is_video(file_path):
-            pattern = r"[a-z0-9]{21}_source"
-            return (
-                re.search(pattern, file_path.stem)
-                and file_path.suffix.lower() in self.valid_filetypes["videos"]
-            )
+        def is_fansly_file(file_path):
+            return "fansly" in file_path.stem.lower()
+
+        def is_ppv_file(file_path):
+            return "ppv" in file_path.stem.lower()
+
+        def is_patreon_file(file_path):
+            return "patreon" in file_path.stem.lower()
 
         return (
-            is_image(file_path)
-            or is_video(file_path)
-            or "onlyfans" in file_path.stem.lower()
+            is_coomer_file(file_path)
+            or is_onlyfans_file(file_path)
+            or is_fansly_file(file_path)
+            or is_ppv_file(file_path)
+            or is_patreon_file(file_path)
         )
-
-    def is_fansly_file(self, file_path: Path):
-        if "fansly" in file_path.stem.lower():
-            return True
-        return False
-
-    def is_ppv_file(self, file_path: Path):
-        if "ppv" in file_path.stem.lower():
-            return True
-        return False
-
-    def is_patreon_file(self, file_path: Path):
-        if "patreon" in file_path.stem.lower():
-            return True
-        return False
 
     def get_unique_file_path(self, file_path: Path) -> Path:
         file_name = file_path.stem

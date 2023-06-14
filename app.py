@@ -33,13 +33,16 @@ def get_config():
         "DO_CONVERTS": True,
         "DO_SANITIZE_FILENAMES": True,
         "DO_REMOVE_DUPLICATE_EXTENSIONS": True,
-        "DO_COOMER_IMPORTS": True,
-        "DO_ONLYFANS_IMPORTS": True,
-        "DO_FANSLY_IMPORTS": True,
-        "DO_PATREON_IMPORTS": True,
-        "DO_PPV_IMPORTS": True,
+        "DO_PREMIUM_IMPORTS": True,
         "DO_LOOSE_FILE_IMPORTS": True,
         "DO_IMAGE_CONVERTS": True,
+        "DO_IMPORT_COOMER": True,
+        "DO_IMPORT_FANHOUSE": True,
+        "DO_IMPORT_FANSLY": True,
+        "DO_IMPORT_GUMROAD": True,
+        "DO_IMPORT_ONLYFANS": True,
+        "DO_IMPORT_PATREON": True,
+        "DO_IMPORT_PPV": True,
         "VALID_FILETYPES": {
             "audio": [".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg"],
             "images": [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp", ".jfif"],
@@ -200,15 +203,10 @@ class FileProcessor:
         self.export_dict(str(self.completion_json), self.result_dict)
 
         total_time = time.time() - start_time
-        total_files = sum(len(v) for v in self.result_dict.values())
-
-        total_actions = len(self.actions_history)
 
         print("-----------------------------------\n\n")
-        if total_actions == 0:
-            print(f"Total files checked: {self.file_count}")
         print(f"Total time: {total_time:.2f} seconds")
-        print(f"Total files: {total_files}\n\n")
+        print(f"Total files: {self.file_count}\n\n")
 
         # patch until im better at tracking actions
         self.videos_to_convert, self.images_to_convert = [
@@ -236,11 +234,11 @@ class FileProcessor:
         input("Press any key to exit...")
 
     def process_file(self, file_path):
-        key = str(file_path.relative_to(self.root_dir).parts[0])
-
-        value = file_path
-        value = value.relative_to(self.root_dir)
-        value = value.parent.name + "/" + value.name
+        relative_path = file_path.relative_to(self.root_dir)
+        key, value = (
+            str(relative_path.parts[0]),
+            f"{relative_path.parent.name}/{relative_path.name}",
+        )
 
         if key in self.result_dict:
             self.result_dict[key].append(value)
@@ -284,20 +282,21 @@ class FileProcessor:
                             self.actions_history.append(file_path)
 
             if self.do_imports:
-                if self.is_premium_file(file_path):
-                    model_premium_dir = self.get_model_premium_dir(file_path)
-                    if not model_premium_dir.exists():
-                        model_premium_dir.mkdir()
+                if self.do_premium_imports:
+                    if self.is_premium_file(file_path):
+                        model_premium_dir = self.get_model_premium_dir(file_path)
+                        if not model_premium_dir.exists():
+                            model_premium_dir.mkdir()
 
-                    input_path = file_path
-                    output_path = model_premium_dir / file_path.name
-                    output_path = self.get_unique_file_path(output_path)
+                        input_path = file_path
+                        output_path = model_premium_dir / file_path.name
+                        output_path = self.get_unique_file_path(output_path)
 
-                    if not self.is_dry_run:
-                        self.rename_file(input_path, output_path)
-                        self.actions_history.append(output_path)
-                    else:
-                        tqdm.write(f"Would move {input_path} to {output_path}")
+                        if not self.is_dry_run:
+                            self.rename_file(input_path, output_path)
+                            self.actions_history.append(output_path)
+                        else:
+                            tqdm.write(f"Would move {input_path} to {output_path}")
 
             if self.do_renames:
                 if self.do_remove_duplicate_extensions:
@@ -469,6 +468,15 @@ class FileProcessor:
             pattern = r"^[a-fA-F0-9]{64}$"
             return bool(re.match(pattern, file_path.stem))
 
+        def is_fanhouse_file(file_path):
+            return "fanhouse" in file_path.stem.lower()
+
+        def is_fansly_file(file_path):
+            return "fansly" in file_path.stem.lower()
+
+        def is_gumroad_file(file_path):
+            return "gumroad" in file_path.stem.lower()
+
         def is_onlyfans_file(file_path):
             def is_image(file_path):
                 pattern = r"\d+x\d+_[a-z0-9]{32}"
@@ -478,7 +486,7 @@ class FileProcessor:
                 )
 
             def is_video(file_path):
-                pattern = r"[a-z0-9]{21}_source"
+                pattern = r"[a-z0-9]{21}(_source|_720p|_1080p)"
                 return (
                     re.search(pattern, file_path.stem)
                     and file_path.suffix.lower() in self.valid_filetypes["videos"]
@@ -490,21 +498,26 @@ class FileProcessor:
                 or "onlyfans" in file_path.stem.lower()
             )
 
-        def is_fansly_file(file_path):
-            return "fansly" in file_path.stem.lower()
-
-        def is_ppv_file(file_path):
-            return "ppv" in file_path.stem.lower()
-
         def is_patreon_file(file_path):
             return "patreon" in file_path.stem.lower()
 
+        def is_ppv_file(file_path):
+            pattern = r"pay[\s_-]*per[\s_-]*view"
+            optional_patterns = ["ppv"]
+
+            if any(pattern in file_path.stem.lower() for pattern in optional_patterns):
+                return True
+
+            return bool(re.search(pattern, file_path.stem.lower()))
+
         return (
-            is_coomer_file(file_path)
-            or is_onlyfans_file(file_path)
-            or is_fansly_file(file_path)
-            or is_ppv_file(file_path)
-            or is_patreon_file(file_path)
+            (self.do_import_coomer and is_coomer_file(file_path))
+            or (self.do_import_fanhouse and is_fanhouse_file(file_path))
+            or (self.do_import_fansly and is_fansly_file(file_path))
+            or (self.do_import_gumroad and is_gumroad_file(file_path))
+            or (self.do_import_onlyfans and is_onlyfans_file(file_path))
+            or (self.do_import_patreon and is_patreon_file(file_path))
+            or (self.do_import_ppv and is_ppv_file(file_path))
         )
 
     def get_unique_file_path(self, file_path: Path) -> Path:

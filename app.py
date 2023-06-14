@@ -595,7 +595,7 @@ class FileProcessor:
             self.images_to_convert.append(file_path)
 
     def get_model_name(self, file_path: Path) -> str:
-        file_model = file_path.parts[file_path.parts.index("collections") + 1]
+        file_model = file_path.parts[file_path.parts.index(self.root_dir.parts[-1]) + 1]
 
         return file_model
 

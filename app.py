@@ -20,7 +20,7 @@ from sanitize_filename import sanitize
 
 def get_config():
     config = {
-        "VERSION": "0.1.1",
+        "VERSION": "0.1.2",
         "AUTHOR": "ne0liberal",
         "ROOT_DIR": Path("A:/Venus/collections"),
         "COMPLETION_JSON": Path("A:/Venus/collections.json"),
@@ -285,12 +285,12 @@ class FileProcessor:
                 if self.do_premium_imports:
                     if self.is_premium_file(file_path):
                         model_premium_dir = self.get_model_premium_dir(file_path)
+
                         if not model_premium_dir.exists():
                             model_premium_dir.mkdir()
 
                         input_path = file_path
                         output_path = model_premium_dir / file_path.name
-                        output_path = self.get_unique_file_path(output_path)
 
                         if not self.is_dry_run:
                             self.rename_file(input_path, output_path)
@@ -543,16 +543,7 @@ class FileProcessor:
 
         if "jpeg" in file_path.suffix.lower():
             output_path = file_path.with_suffix(".jpg")
-            output_path = self.get_unique_file_path(output_path)
-
-            file_path.rename(output_path)
-
-            tqdm.write(f"Original: {file_path}")
-            tqdm.write(f"     New: {output_path}\n")
-
-            if file_path in self.images_to_convert:
-                self.images_to_convert.remove(file_path)
-
+            self.rename_file(file_path, output_path)
             return
 
         if file_path.suffix.lower() in [".png", ".jfif"]:
@@ -673,6 +664,8 @@ class FileProcessor:
 
             if input_size == output_size:
                 input_path.unlink()
+                tqdm.write("File already exists.")
+                tqdm.write(f"Deleted duplicate file: {input_path}\n")
                 return
             else:
                 potential_output_path = self.get_unique_file_path(output_path)

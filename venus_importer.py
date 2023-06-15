@@ -279,7 +279,7 @@ class FileProcessor:
                 if self.has_duplicate_extensions(file_path):
                     input_path = file_path
 
-                    output_name = self.remove_duped_extensions(input_path.name)
+                    output_name = self.remove_duplicate_extensions(input_path.name)
                     output_path = input_path.parent / output_name
 
                     if output_path != file_path:
@@ -439,41 +439,42 @@ class FileProcessor:
         return is_protected_file(file_path)
 
     def has_duplicate_extensions(self, file_path: Path):
+        file_path = Path(file_path)
+
         file_name = file_path.name
 
         parts = file_name.split(".")
-        original_file_name = ".".join(parts[:-1])
+        file_stem = ".".join(parts[:-1])
 
-        all_possible_extensions = (
+        self.possible_extensions = (
             self.valid_filetypes["videos"] + self.valid_filetypes["images"]
         )
-        for ext in all_possible_extensions:
-            if ext in original_file_name:
+
+        for ext in self.possible_extensions:
+            if ext in file_stem:
                 return True
+
         return False
 
-    def remove_duped_extensions(self, file_path: Path):
+    def remove_duplicate_extensions(self, file_path: Path):
         file_path = Path(file_path)
+
         file_name = file_path.name
+
         parts = file_name.split(".")
-        actual_suffix = parts[-1]
+        actual_ext = parts[-1]
+        output_name = ".".join(parts[:-1])
 
-        all_possible_extensions = (
-            self.valid_filetypes["videos"] + self.valid_filetypes["images"]
-        )
+        for ext in self.possible_extensions:
+            if ext in output_name:
+                output_name = output_name.replace(ext, "")
 
-        new_file_name = ".".join(parts[:-1])
+        output_name = f"{output_name}.{actual_ext}"
 
-        for ext in all_possible_extensions:
-            if ext in new_file_name:
-                new_file_name = new_file_name.replace(ext, "")
-
-        new_file_name = f"{new_file_name}.{actual_suffix}"
-
-        if file_name == new_file_name:
+        if file_name == output_name:
             return file_name
 
-        return new_file_name
+        return output_name
 
     def is_premium_file(self, file_path: Path):
         def is_coomer_file(file_path):

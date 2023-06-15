@@ -168,8 +168,24 @@ class FileProcessor:
             amnt = f"Videos to convert: ({len(self.videos_to_convert)})"
             print(amnt)
             print("-" * len(amnt))
+            videos_by_extension = {}
             for video in self.videos_to_convert:
-                print(str(video))
+                video_path = str(video)
+                extension = os.path.splitext(video_path)[1][1:]
+                if extension not in videos_by_extension:
+                    videos_by_extension[extension] = []
+                videos_by_extension[extension].append(video_path)
+
+            sorted_videos = sorted(
+                self.videos_to_convert, key=lambda x: os.path.splitext(str(x))[-1][1:]
+            )
+            for extension, videos in videos_by_extension.items():
+                print()
+                print(f"Extension: .{extension}")
+                for video in sorted_videos:
+                    video_path = str(video)
+                    if video_path in videos:
+                        print(video_path)
 
         if self.images_to_convert:
             if self.videos_to_convert:
@@ -177,8 +193,24 @@ class FileProcessor:
             amnt = f"Images to convert: ({len(self.images_to_convert)})"
             print(amnt)
             print("-" * len(amnt))
+            images_by_extension = {}
             for image in self.images_to_convert:
-                print(str(image))
+                image_path = str(image)
+                extension = os.path.splitext(image_path)[1][1:]
+                if extension not in images_by_extension:
+                    images_by_extension[extension] = []
+                images_by_extension[extension].append(image_path)
+
+            sorted_images = sorted(
+                self.images_to_convert, key=lambda x: os.path.splitext(str(x))[-1][1:]
+            )
+            for extension, images in images_by_extension.items():
+                print()
+                print(f"Extension: .{extension}")
+                for image in sorted_images:
+                    image_path = str(image)
+                    if image_path in images:
+                        print(image_path)
 
         print()
         input("Press any key to exit...")

@@ -31,7 +31,7 @@ class Config:
 
     def get_value(self, key):
         value = self.config.get(key)
-        if key in ["ROOT_DIR", "COMPLETION_JSON", "HISTORY_FILE"]:
+        if key in ["root_dir", "completion_json", "history_file"]:
             value = Path(value)
         return value
 
@@ -116,8 +116,7 @@ class FileProcessor:
 
         self.config = Config()
         for key in self.config.config.keys():
-            setattr(self, key.lower(), self.config.get_value(key))
-
+            setattr(self, key, self.config.get_value(key))
         self.history_instance = History(self.history_file)
 
         self.progress_bar = None
@@ -600,7 +599,8 @@ class FileProcessor:
         filename = remove_halfwidth_fullwidth_characters(filename)
         filename = remove_emojis(filename)
         filename = remove_invalid_characters(filename)
-        filename = remove_capital_letters(filename)
+        if self.do_renames_lowercase:
+            filename = remove_capital_letters(filename)
         filename = remove_double_spaces(filename)
         filename = remove_trailing_characters(filename)
         filename = sanitize(filename)

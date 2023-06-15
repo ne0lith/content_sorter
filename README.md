@@ -48,7 +48,7 @@ protected_dirs:
 These files can exist wherever you prefer.
 
 ### Folder Structure for Compatibility
-To ensure ompatibility with this script, it is crucial to organize your folder structure as follows:
+To ensure compatibility with this script, it is crucial to organize your folder structure as follows:
 
 ```
 D:\

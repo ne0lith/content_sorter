@@ -1,93 +1,42 @@
 import os
 import re
 import sys
-import builtins
 import json
 import time
 import ftfy
+import uuid
+import yaml
 import emoji
 import shutil
-import traceback
-import uuid
+import fnmatch
 import datetime
-from tqdm import tqdm
+import builtins
+import traceback
 from PIL import Image
+from tqdm import tqdm
 from pathlib import Path
 from functools import partial
 from multiprocessing import Pool
 from sanitize_filename import sanitize
 
 
-def get_config():
-    config = {
-        "VERSION": "0.1.2",
-        "AUTHOR": "ne0liberal",
-        "ROOT_DIR": Path("A:/Venus/collections"),
-        "COMPLETION_JSON": Path("A:/Venus/collections.json"),
-        "HISTORY_FILE": Path("A:/Venus/history/history.json"),
-        "PREMIUM_DIR": "premium",
-        "IS_DRY_RUN": False,
-        "IS_DEBUG": False,
-        "DO_IMPORTS": True,
-        "DO_RENAMES": True,
-        "DO_CONVERTS": True,
-        "DO_SANITIZE_FILENAMES": True,
-        "DO_REMOVE_DUPLICATE_EXTENSIONS": True,
-        "DO_PREMIUM_IMPORTS": True,
-        "DO_LOOSE_FILE_IMPORTS": True,
-        "DO_IMAGE_CONVERTS": True,
-        "DO_IMPORT_COOMER": True,
-        "DO_IMPORT_FANHOUSE": True,
-        "DO_IMPORT_FANSLY": True,
-        "DO_IMPORT_GUMROAD": True,
-        "DO_IMPORT_ONLYFANS": True,
-        "DO_IMPORT_PATREON": True,
-        "DO_IMPORT_PPV": True,
-        "VALID_FILETYPES": {
-            "audio": [".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg"],
-            "images": [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp", ".jfif"],
-            "text": [".txt", ".doc", ".docx", ".pdf", ".rtf", ".xls", ".xlsx"],
-            "misc": [".zip", ".rar", ".7z", ".torrent", ".heic"],
-            "videos": [
-                ".mp4",
-                ".mkv",
-                ".mov",
-                ".m4v",
-                ".wmv",
-                ".webm",
-                ".gif",
-                ".avi",
-                ".ts",
-                ".mpg",
-                ".flv",
-                ".mpeg",
-            ],
-        },
-        "GOAL_VIDEO_EXTENSION": [".mp4", ".webm", ".gif"],
-        "GOAL_IMAGE_EXTENSION": [".jpg", ".webp"],
-        "PROTECTED_MODELS": [
-            "darshelle stevens",
-            "darshelle stevens - fix",
-            "darshelle - jessica - meg crossovers",
-            "jessica nigri",
-            "jessica nigri - fix",
-            "meg turney",
-            "meg turney - fix",
-            "virtual reality (vr)",
-        ],
-        "PROTECTED_DIRS": [
-            "corrupted",
-            "deepfakes",
-            "favorites",
-            "fix",
-            "manual_review",
-            "premium",
-            "sorted albums",
-            "youtube",
-        ],
-    }
+class Config:
+    def __init__(self):
+        self.config_path = Path(__file__).parent / "config.yaml"
+        self.load_config()
 
-    return config
+    def load_config(self):
+        with open(self.config_path, "r") as f:
+            self.config = yaml.safe_load(f)
+
+    def get_value(self, key):
+        value = self.config.get(key)
+        if key in ["ROOT_DIR", "COMPLETION_JSON", "HISTORY_FILE"]:
+            value = Path(value)
+        return value
+
+    def set_value(self, key, value):
+        self.config[key] = value
 
 
 class CustomEnvironment:
@@ -95,6 +44,7 @@ class CustomEnvironment:
         self.original_print = builtins.print
         self.original_input = builtins.input
         self.original_write = tqdm.write
+        sys.stdout.write("\033[?25l")
 
         builtins.print = self.custom_print
         builtins.input = self.custom_input
@@ -122,6 +72,7 @@ class CustomEnvironment:
         builtins.print = self.original_print
         builtins.input = self.original_input
         tqdm.write = self.original_write
+        sys.stdout.write("\033[?25h")
 
 
 class History:
@@ -163,14 +114,18 @@ class FileProcessor:
     def __init__(self, num_processes):
         self.num_processes = num_processes
 
-        self.config = get_config()
-        for key in self.config.keys():
-            setattr(self, key.lower(), self.config[key])
+        self.config = Config()
+        for key in self.config.config.keys():
+            setattr(self, key.lower(), self.config.get_value(key))
+
         self.history_instance = History(self.history_file)
 
         self.progress_bar = None
         self.file_count = 0
-        self.update_interval = 850
+        self.update_interval = 350
+
+        self.excluded_dirs = self.exclude_dirs = self.protected_dirs
+        self.excluded_dirs += [self.root_dir / dir for dir in self.protected_models]
 
         self.result_dict = dict()
         self.videos_to_convert = list()
@@ -184,7 +139,6 @@ class FileProcessor:
     def crawl_root(self):
         start_time = time.time()
 
-        sys.stdout.write("\033[?25l")
         self.progress_bar = tqdm(
             desc=f'    Crawling "{self.root_dir}"',
             unit=" files",
@@ -197,7 +151,6 @@ class FileProcessor:
             partial_process_file = partial(self.process_file)
             self.process_directory(self.root_dir, partial_process_file)
         self.progress_bar.close()
-        sys.stdout.write("\033[?25h")
 
         self.history_instance.save_history()
         self.export_dict(str(self.completion_json), self.result_dict)
@@ -207,12 +160,6 @@ class FileProcessor:
         print("-----------------------------------\n\n")
         print(f"Total time: {total_time:.2f} seconds")
         print(f"Total files: {self.file_count}\n\n")
-
-        # patch until im better at tracking actions
-        self.videos_to_convert, self.images_to_convert = [
-            list(filter(lambda item: item.exists(), lst))
-            for lst in (self.videos_to_convert, self.images_to_convert)
-        ]
 
         if self.videos_to_convert:
             amnt = f"Videos to convert: ({len(self.videos_to_convert)})"
@@ -281,6 +228,10 @@ class FileProcessor:
                             tqdm.write(f"Would convert {file_path}")
                             self.actions_history.append(file_path)
 
+                if self.do_video_converts:
+                    if "vid" in file_path.suffix:
+                        self.convert_to_mp4(file_path)
+
             if self.do_imports:
                 if self.do_premium_imports:
                     if self.is_premium_file(file_path):
@@ -299,6 +250,16 @@ class FileProcessor:
                             tqdm.write(f"Would move {input_path} to {output_path}")
 
             if self.do_renames:
+                if file_path.exists():
+                    if file_path.name != file_path.name.lower():
+                        try:
+                            new_file_path = file_path.parent / file_path.name.lower()
+                            file_path.rename(new_file_path)
+                            tqdm.write(f"Original: {file_path}")
+                            tqdm.write(f"     New: {new_file_path}\n")
+                        except Exception as e:
+                            tqdm.write(f"Error: {e}\n")
+
                 if self.do_remove_duplicate_extensions:
                     if file_path.exists():
                         if self.has_duplicate_extensions(file_path):
@@ -371,30 +332,27 @@ class FileProcessor:
                                     f"\nWould move {input_path} to {output_path}"
                                 )
 
-    def process_directory(self, dir_path, partial_func, exclude_dirs=None):
-        if exclude_dirs is None:
-            exclude_dirs = self.protected_dirs
-            exclude_dirs += [self.root_dir / dir for dir in self.protected_models]
-
-        # i believe this is a huge inefficiency
-        # but don't know enough to figure out a better way
+    def process_directory(self, dir_path, partial_func):
         for entry in os.scandir(dir_path):
             if entry.is_dir():
                 skip_directory = False
-                for exclude_dir in exclude_dirs:
-                    if exclude_dir in Path(entry.path).parts or exclude_dir == Path(
-                        entry.path
-                    ):
-                        skip_directory = True
-                        break
+                for exclude_dir in self.exclude_dirs:
+                    if isinstance(exclude_dir, str):
+                        if fnmatch.fnmatch(entry.name, exclude_dir):
+                            skip_directory = True
+                            break
+                    elif isinstance(exclude_dir, Path):
+                        if entry.path.startswith(str(exclude_dir)):
+                            skip_directory = True
+                            break
 
                 if skip_directory:
                     if self.is_debug:
                         tqdm.write(f"Skipping {entry.path}")
                     continue
 
-                self.process_directory(entry.path, partial_func, exclude_dirs)
-            elif entry.is_file():
+                self.process_directory(entry.path, partial_func)
+            if entry.is_file():
                 partial_func(Path(entry.path))
 
     def validate_path(self, path: Path, expect=None):
@@ -521,7 +479,7 @@ class FileProcessor:
         )
 
     def get_unique_file_path(self, file_path: Path) -> Path:
-        file_name = file_path.stem
+        file_name = file_path.stem.lower()
         file_ext = file_path.suffix
 
         unique_file_path = file_path
@@ -537,6 +495,14 @@ class FileProcessor:
             )
 
         return unique_file_path
+
+    def convert_to_mp4(self, file_path: Path):
+        file_path = Path(file_path)
+
+        if "vid" in file_path.suffix.lower():
+            output_path = file_path.with_suffix(".mp4")
+            self.rename_file(file_path, output_path)
+            return
 
     def convert_to_jpg(self, file_path: Path):
         file_path = Path(file_path)
@@ -642,6 +608,8 @@ class FileProcessor:
         return sanitized_filename
 
     def rename_file(self, input_path: Path, output_path: Path):
+        input_path = Path(input_path)
+        output_path = Path(output_path)
         output_path = output_path.parent / output_path.name.lower()
 
         if not self.validate_path(input_path, expect="file"):
@@ -712,8 +680,9 @@ class FileProcessor:
 def main():
     os.system("cls")
     with CustomEnvironment():
-        processor = FileProcessor(num_processes=10)
+        processor = FileProcessor(8)
         processor.crawl_root()
+        print()
 
 
 if __name__ == "__main__":

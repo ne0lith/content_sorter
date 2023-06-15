@@ -98,14 +98,6 @@ An important consideration in this script is the treatment of the do_renames_low
 
 This behavior ensures consistency within the script and promotes conformity to lowercase naming conventions. It's important to be aware of this behavior when working with the script to avoid unexpected outcomes.
 
-### Improved Import Scheme for Fan Platforms
-
-This project focuses on enhancing the import scheme for popular fan platforms, including Fanhouse, Fansly, Gumroad, and Patreon. Currently, the script imports files based on the presence of specific strings in the file names. However, the file naming conventions for these platforms are unfamiliar, leading to potential limitations.
-
-To overcome this challenge, I am actively refining the import process to provide broader support for various file naming schemes across these platforms. Notably, I have encountered no issues with platforms like OnlyFans and Coomerparty. Additionally, I have implemented a fallback mechanism that references the site name within the file for OnlyFans.
-
-The objective is to ensure a seamless and reliable import experience by accommodating the unique file naming conventions of different fan platforms. I appreciate any interest and would love if anyone decided to contribute to the project and provide feedback to enhance the functionality and usability of the import scheme.
-
 ### File Renaming with Size Mismatch
 
 During the file import or moving process, it's important to be aware of a specific limitation related to file renaming. If the script encounters a situation where it needs to rename a file due to a size mismatch, a naming convention will be applied. In this scenario, the file name will be modified from filename.jpg to filename_duplicate_n.jpg, where n represents the number of attempts made to find a unique file name.
@@ -113,6 +105,14 @@ During the file import or moving process, it's important to be aware of a specif
 While this approach ensures that files are properly renamed to avoid conflicts, it does introduce a potential limitation. The original file name may be altered to include the "duplicate" label and an appended number, which could deviate from the desired naming convention or disrupt the intended file organization.
 
 It is important to consider this limitation when working with the script and be prepared for the possibility of modified file names when mismatches in file sizes occur.
+
+### Improved Import Scheme for Fan Platforms
+
+This project focuses on enhancing the import scheme for popular fan platforms, including Fanhouse, Fansly, Gumroad, and Patreon. Currently, the script imports files based on the presence of specific strings in the file names. However, the file naming conventions for these platforms are unfamiliar, leading to potential limitations.
+
+To overcome this challenge, I am actively refining the import process to provide broader support for various file naming schemes across these platforms. Notably, I have encountered no issues with platforms like OnlyFans and Coomerparty. Additionally, I have implemented a fallback mechanism that references the site name within the file for OnlyFans.
+
+The objective is to ensure a seamless and reliable import experience by accommodating the unique file naming conventions of different fan platforms. I appreciate any interest and would love if anyone decided to contribute to the project and provide feedback to enhance the functionality and usability of the import scheme.
 
 ```python
 def is_coomer_file(file_path):

@@ -132,7 +132,6 @@ class FileProcessor:
         self.result_dict = dict()
         self.videos_to_convert = list()
         self.images_to_convert = list()
-        self.actions_history = list()
 
         print("\n" + self.display_ascii_art() + "\n")
         print(f"Version: {self.version}")
@@ -229,14 +228,11 @@ class FileProcessor:
                             if file_path in self.images_to_convert:
                                 self.images_to_convert.remove(file_path)
 
-                            self.actions_history.append(output_path)
                             file_path = output_path
                         except Exception as e:
                             tqdm.write(f"Error: {e}")
-                            self.actions_history.append(file_path)
                     else:
                         tqdm.write(f"Would convert {file_path}")
-                        self.actions_history.append(file_path)
 
             if self.do_video_converts:
                 input_path = file_path
@@ -258,7 +254,6 @@ class FileProcessor:
                         output_path = input_path.parent / input_path.name.lower()
                         if not self.is_dry_run:
                             self.rename_file(input_path, output_path)
-                            self.actions_history.append(output_path)
                             file_path = output_path
                         else:
                             tqdm.write(f"Would rename {input_path} to {output_path}\n")
@@ -275,11 +270,9 @@ class FileProcessor:
                     if output_path != file_path:
                         if not self.is_dry_run:
                             self.rename_file(input_path, output_path)
-                            self.actions_history.append(output_path)
                             file_path = output_path
                         else:
                             tqdm.write(f"Would rename {file_path} to {output_path}\n")
-                            self.actions_history.append(file_path)
 
             if not self.check_protected(file_path):
                 if self.do_sanitize_filenames:
@@ -291,11 +284,9 @@ class FileProcessor:
                     if input_path != output_path:
                         if not self.is_dry_run:
                             self.rename_file(input_path, output_path)
-                            self.actions_history.append(output_path)
                             file_path = output_path
                         else:
                             tqdm.write(f"\nWould rename {input_path} to {output_path}")
-                            self.actions_history.append(input_path)
 
         if self.do_imports:
             if not self.check_protected(file_path):
@@ -312,7 +303,6 @@ class FileProcessor:
 
                         if not self.is_dry_run:
                             self.rename_file(input_path, output_path)
-                            self.actions_history.append(output_path)
                             file_path = output_path
                         else:
                             tqdm.write(f"Would move {input_path} to {output_path}")
@@ -341,7 +331,6 @@ class FileProcessor:
                     if not subdir_path.exists():
                         if not self.is_dry_run:
                             subdir_path.mkdir()
-                            self.actions_history.append(subdir_path)
                         else:
                             tqdm.write(f"\nWould create {subdir_path}")
 
@@ -350,7 +339,6 @@ class FileProcessor:
 
                     if not self.is_dry_run:
                         self.rename_file(input_path, output_path)
-                        self.actions_history.append(output_path)
                         file_path = output_path
                     else:
                         tqdm.write(f"\nWould move {input_path} to {output_path}")

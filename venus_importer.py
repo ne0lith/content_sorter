@@ -124,6 +124,7 @@ class FileProcessor:
         self.update_interval = 850
 
         self.excluded_dirs = self.exclude_dirs = self.protected_dirs
+        self.excluded_dirs += [self.premium_dir]
         self.excluded_dirs += [self.root_dir / dir for dir in self.protected_models]
 
         self.result_dict = dict()

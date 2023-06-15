@@ -76,6 +76,22 @@ Customize these lists according to your specific requirements to ensure that cer
 
 ## Usage
 
+### Usage Note: Initial Configuration for Testing
+
+Before executing the script in a production environment, it is strongly recommended to set both is_dry_run and is_debug parameters to true on your first run. This allows you to observe and understand the impact the script will have on your libraries without making any actual changes.
+
+By setting is_dry_run to true, the script will simulate the sorting and renaming operations without modifying any files or directories. This enables you to preview the outcome and evaluate if the script aligns with your expectations.
+
+Similarly, setting is_debug to true provides additional logging and debugging information during script execution. This helps in identifying any potential issues or inconsistencies in the script's behavior.
+
+Once you have thoroughly reviewed the simulated results and are satisfied with the script's behavior, you can set both is_dry_run and is_debug parameters to false for the actual execution, allowing the script to make the intended changes to your libraries.
+
+Remember, it is crucial to exercise caution and test the script thoroughly before applying it to your valuable content libraries to ensure a smooth and desirable outcome.
+
+Please note that during a dry run simulation, no actual changes should occur to your libraries. However, as the script creator, I have to acknowledge the possibility of overlooking something due to prolonged exposure to the code.
+
+While I have made efforts to ensure the script's accuracy and functionality, I recommend users to thoroughly review the code before running even the simulation. This allows users to familiarize themselves with the script's operations and logic, ensuring a better understanding of the potential outcomes.
+
 ### Assumptions and Expected Structure
 
 To ensure the proper functioning of this script, it assumes that your ISOs are organized in a specific manner, as described above. Upon completion of the script, the resulting structure of your ISOs should resemble the following:
@@ -118,6 +134,12 @@ If preserving the original filenames and avoiding any alterations is a priority 
 An important consideration in this script is the treatment of the do_renames_lowercase parameter. While the key exists and can be configured, it is essential to note that the script inherently favors lowercase file names. Consequently, even if the do_renames_lowercase parameter is set to false, the file names will still be transformed to lowercase.
 
 This behavior ensures consistency within the script and promotes conformity to lowercase naming conventions. It's important to be aware of this behavior when working with the script to avoid unexpected outcomes.
+
+### Handling of do_remove_duplicate_extensions
+
+The do_remove_duplicate_extensions feature addresses the issue of multiple occurrences of file extensions within a filename. When enabled, this functionality attempts to remove redundant file extensions from filenames. For example, filename.jpg.jpg or filenamejpg.jpg would be transformed into filename.jpg. Additionally, cases like videoname.mp4screenshots.jpg would be modified to videonamescreenshots.jpg.
+
+However, it is important to note that enabling this feature carries a level of uncertainty. While it aims to streamline filenames by removing duplicate extensions, it may occasionally lead to unexpected results. Therefore, exercising caution is advised when deciding to enable or disable this feature.
 
 ### File Renaming with Size Mismatch
 

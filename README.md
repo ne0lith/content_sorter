@@ -122,7 +122,7 @@ D:\
 
 ### Handling of do_sanitize_filenames
 
-One particular aspect of the script that may be considered as the least desirable is the `do_sanitize_filenames` parameter, which is set to true by default. This parameter plays a role in sanitizing and cleaning up the filenames during the sorting process.
+One particular aspect of the script that may be considered as the least desirable is the `do_sanitize_filenames` parameter, which is set to `true` by default. This parameter plays a role in sanitizing and cleaning up the filenames during the sorting process.
 
 However, it is important to note that the `do_sanitize_filenames` functionality may not align with my personal preferences, as it involves making modifications to the original filenames. This can sometimes lead to a loss of the original naming context or result in unintended changes.
 

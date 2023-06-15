@@ -133,7 +133,10 @@ class FileProcessor:
         self.videos_to_convert = list()
         self.images_to_convert = list()
 
-        print("\n" + self.display_ascii_art() + "\n")
+        self.ascii_art = "\n".join(
+            ["    " + line for line in self.ascii_art.split("\n")]
+        )
+        print("\n" + self.ascii_art + "\n\n")
         print(f"Version: {self.version}")
         print(f" Author: {self.author}\n\n")
 
@@ -696,25 +699,6 @@ class FileProcessor:
                 indent=4,
                 default=lambda x: x.decode() if isinstance(x, bytes) else x,
             )
-
-    def display_ascii_art(self):
-        ascii_art = """
-    :::     ::: :::::::::: ::::    ::: :::    :::  ::::::::  
-    :+:     :+: :+:        :+:+:   :+: :+:    :+: :+:    :+: 
-    +:+     +:+ +:+        :+:+:+  +:+ +:+    +:+ +:+        
-    +#+     +:+ +#++:++#   +#+ +:+ +#+ +#+    +:+ +#++:++#++ 
-    +#+   +#+  +#+        +#+  +#+#+# +#+    +#+        +#+ 
-    #+#+#+#+#+   #+#        #+#   #+#+# #+#    #+# #+#    #+# 
-        ###     ########## ###    ####  ########   ########  
-    :::::::::::: ::::    ::::  :::::::::   ::::::::  :::::::::  ::::::::::: :::::::::: :::::::::  
-        :+:     +:+:+: :+:+:+ :+:    :+: :+:    :+: :+:    :+:     :+:     :+:        :+:    :+: 
-        +:+     +:+ +:+:+ +:+ +:+    +:+ +:+    +:+ +:+    +:+     +:+     +:+        +:+    +:+ 
-        +#+     +#+  +:+  +#+ +#++:++#+  +#+    +:+ +#++:++#:      +#+     +#++:++#   +#++:++#:  
-        +#+     +#+       +#+ +#+        +#+    +#+ +#+    +#+     +#+     +#+        +#+    +#+ 
-        #+#     #+#       #+# #+#        #+#    #+# #+#    #+#     #+#     #+#        #+#    #+# 
-    ########### ###       ### ###         ########  ###    ###     ###     ########## ###    ###
-    """
-        return ascii_art
 
 
 def main():

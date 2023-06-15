@@ -137,7 +137,7 @@ This behavior ensures consistency within the script and promotes conformity to l
 
 ### Handling of do_remove_duplicate_extensions
 
-The do_remove_duplicate_extensions feature addresses the issue of multiple occurrences of file extensions within a filename. When enabled, this functionality attempts to remove redundant file extensions from filenames. For example, filename.jpg.jpg or filenamejpg.jpg would be transformed into filename.jpg. Additionally, cases like videoname.mp4screenshots.jpg would be modified to videonamescreenshots.jpg.
+The do_remove_duplicate_extensions feature addresses the issue of multiple occurrences of file extensions within a filename. When enabled, this functionality attempts to remove redundant file extensions from filenames. For example, filename.jpg.jpg or filenamejpg.jpg would be transformed into filename.jpg. Additionally, cases like 0heu75gekk9f1qxw2mztu_source.mp4_thumbsc69fbac96d57811d.jpg would be modified to 0heu75gekk9f1qxw2mztu_source_thumbsc69fbac96d57811d.jpg.
 
 However, it is important to note that enabling this feature carries a level of uncertainty. While it aims to streamline filenames by removing duplicate extensions, it may occasionally lead to unexpected results. Therefore, exercising caution is advised when deciding to enable or disable this feature.
 

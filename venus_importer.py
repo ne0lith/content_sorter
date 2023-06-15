@@ -216,34 +216,6 @@ class FileProcessor:
         input("Press any key to exit...")
 
     def process_file(self, file_path):
-        relative_path = file_path.relative_to(self.root_dir)
-        key, value = (
-            str(relative_path.parts[0]),
-            f"{relative_path.parent.name}/{relative_path.name}",
-        )
-
-        if key in self.result_dict:
-            self.result_dict[key].append(value)
-        else:
-            self.result_dict[key] = [value]
-
-        self.file_count += 1
-
-        if self.file_count % self.update_interval == 0:
-            self.progress_bar.update(self.update_interval)
-
-        if (
-            file_path.suffix.lower() in self.valid_filetypes["images"]
-            and file_path.suffix.lower() not in self.goal_image_extension
-        ):
-            self.images_to_convert.append(file_path)
-
-        if (
-            file_path.suffix.lower() in self.valid_filetypes["videos"]
-            and file_path.suffix.lower() not in self.goal_video_extension
-        ):
-            self.videos_to_convert.append(file_path)
-
         if self.do_converts:
             if self.do_image_converts:
                 input_path = file_path
@@ -382,6 +354,34 @@ class FileProcessor:
                         file_path = output_path
                     else:
                         tqdm.write(f"\nWould move {input_path} to {output_path}")
+
+        if (
+            file_path.suffix.lower() in self.valid_filetypes["images"]
+            and file_path.suffix.lower() not in self.goal_image_extension
+        ):
+            self.images_to_convert.append(file_path)
+
+        if (
+            file_path.suffix.lower() in self.valid_filetypes["videos"]
+            and file_path.suffix.lower() not in self.goal_video_extension
+        ):
+            self.videos_to_convert.append(file_path)
+
+        relative_path = file_path.relative_to(self.root_dir)
+        key, value = (
+            str(relative_path.parts[0]),
+            f"{relative_path.parent.name}/{relative_path.name}",
+        )
+
+        if key in self.result_dict:
+            self.result_dict[key].append(value)
+        else:
+            self.result_dict[key] = [value]
+
+        self.file_count += 1
+
+        if self.file_count % self.update_interval == 0:
+            self.progress_bar.update(self.update_interval)
 
     def process_directory(self, dir_path, partial_func):
         for entry in os.scandir(dir_path):

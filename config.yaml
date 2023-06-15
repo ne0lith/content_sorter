@@ -1,8 +1,8 @@
-version: "0.1.3"
+version: "0.1.5"
 author: "ne0liberal"
-root_dir: "path/to/your/collection/root"
-completion_json: "path/to/save/index.json"
-history_file: "path/to/save/history.json"
+root_dir: "D:/Content/ISOs"
+completion_json: "D:/Content/index.json"
+history_file: "D:/Content/history/history.json"
 premium_dir: "premium"
 is_dry_run: true
 is_debug: true
@@ -96,6 +96,5 @@ protected_dirs:
   - "favorites"
   - "fix"
   - "manual_review"
-  - "premium"
   - "sorted albums"
   - "youtube"

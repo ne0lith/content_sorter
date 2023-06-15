@@ -181,13 +181,19 @@ class FileProcessor:
             sorted_videos = sorted(
                 self.videos_to_convert, key=lambda x: os.path.splitext(str(x))[-1][1:]
             )
-            for extension, videos in videos_by_extension.items():
+
+            sorted_videos_by_extension = dict(
+                sorted(videos_by_extension.items(), key=lambda item: item[0])
+            )
+
+            for extension, videos in sorted_videos_by_extension.items():
                 print()
                 print(f"Extension: .{extension}")
-                for video in sorted_videos:
-                    video_path = str(video)
-                    if video_path in videos:
-                        print(video_path)
+                [
+                    print(video_path)
+                    for video_path in sorted_videos
+                    if str(video_path) in videos
+                ]
 
         if self.images_to_convert:
             if self.videos_to_convert:
@@ -206,13 +212,19 @@ class FileProcessor:
             sorted_images = sorted(
                 self.images_to_convert, key=lambda x: os.path.splitext(str(x))[-1][1:]
             )
-            for extension, images in images_by_extension.items():
+
+            sorted_images_by_extension = dict(
+                sorted(images_by_extension.items(), key=lambda item: item[0])
+            )
+
+            for extension, images in sorted_images_by_extension.items():
                 print()
                 print(f"Extension: .{extension}")
-                for image in sorted_images:
-                    image_path = str(image)
-                    if image_path in images:
-                        print(image_path)
+                [
+                    print(image_path)
+                    for image_path in sorted_images
+                    if str(image_path) in images
+                ]
 
         print()
         input("Press any key to exit...")

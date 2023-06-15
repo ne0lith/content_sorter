@@ -94,7 +94,7 @@ While I have made efforts to ensure the script's accuracy and functionality, I r
 
 ### Assumptions and Expected Structure
 
-To ensure the proper functioning of this script, it assumes that your ISOs are organized in a specific manner, as described above. Upon completion of the script, the resulting structure of your ISOs should resemble the following:
+To ensure the proper functioning of this script, it assumes that your ISOs are organized in a specific manner, [as described above](#folder-structure-for-compatibility). Upon completion of the script, the resulting structure of your ISOs should resemble the following:
 
 ```
 D:\

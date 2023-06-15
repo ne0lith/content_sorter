@@ -10,8 +10,8 @@ do_imports: true
 do_renames: true
 do_renames_lowercase: true
 do_converts: true
-do_sanitize_filenames: true
-do_remove_duplicate_extensions: true
+do_sanitize_filenames: false # destructive
+do_remove_duplicate_extensions: true # destructive
 do_premium_imports: true
 do_loose_file_imports: true
 do_image_converts: true

@@ -229,7 +229,10 @@ class FileProcessor:
 
                 if self.do_video_converts:
                     if "vid" in file_path.suffix:
-                        self.convert_to_mp4(file_path)
+                        if not self.is_dry_run:
+                            self.convert_to_mp4(file_path)
+                        else:
+                            tqdm.write(f"Would rename {file_path} to be .mp4")
 
             if self.do_imports:
                 if self.do_premium_imports:
@@ -256,9 +259,14 @@ class FileProcessor:
                                 new_file_path = (
                                     file_path.parent / file_path.name.lower()
                                 )
-                                file_path.rename(new_file_path)
-                                tqdm.write(f"Original: {file_path}")
-                                tqdm.write(f"     New: {new_file_path}\n")
+                                if not self.is_dry_run:
+                                    file_path.rename(new_file_path)
+                                    tqdm.write(f"Original: {file_path}")
+                                    tqdm.write(f"     New: {new_file_path}\n")
+                                else:
+                                    tqdm.write(
+                                        f"Would rename {file_path} to {new_file_path}\n"
+                                    )
                             except Exception as e:
                                 tqdm.write(f"Error: {e}\n")
 
@@ -274,7 +282,7 @@ class FileProcessor:
                                     self.actions_history.append(new_file_path)
                                 else:
                                     tqdm.write(
-                                        f"Would rename {file_path} to {new_file_path}"
+                                        f"Would rename {file_path} to {new_file_path}\n"
                                     )
                                     self.actions_history.append(file_path)
 

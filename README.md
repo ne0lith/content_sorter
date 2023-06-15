@@ -61,15 +61,15 @@ D:\
 
 ### Understanding protected_models and protected_dirs
 
-In this script, the concepts of protected_models and protected_dirs play a vital role in controlling the file processing behavior. Let's explore how these two lists work:
+In this script, the concepts of `protected_models` and `protected_dirs` play a vital role in controlling the file processing behavior. Let's explore how these two lists work:
 
 #### protected_models:
-The protected_models list consists of the first-level subdirectories (model folders) located within the root_dir. By adding a model folder name to the protected_models list (e.g., "angela white" or "amilia onyx"), the script ensures that all files and subdirectories within those protected model folders are ignored during processing. Essentially, any content within these protected model folders will be excluded from the script's operations.
+The `protected_models` list consists of the first-level subdirectories (model folders) located within the `root_dir`. By adding a model folder name to the `protected_models` list (e.g., "angela white" or "amilia onyx"), the script ensures that all files and subdirectories within those protected model folders are ignored during processing. Essentially, any content within these protected model folders will be excluded from the script's operations.
 
 #### protected_dirs:
-On the other hand, the protected_dirs list contains general named subdirectories that are not limited to specific model folders. If any model folder contains a subdirectory with a name that matches one of the entries in the protected_dirs list, the script will ignore all files and folders within that specific subdirectory. This allows for selective exclusion of content based on these named subdirectories, regardless of the model folder in which they reside. Your premium_dir will be hardcoded into this to prevent recursion issues.
+On the other hand, the `protected_dirs` list contains general named subdirectories that are not limited to specific model folders. If any model folder contains a subdirectory with a name that matches one of the entries in the `protected_dirs` list, the script will ignore all files and folders within that specific subdirectory. This allows for selective exclusion of content based on these named subdirectories, regardless of the model folder in which they reside. Your `premium_dir` will be hardcoded into this to prevent potential recursion issues.
 
-By utilizing these lists, you gain greater control over which files and directories are processed by the script. The protected_models list targets specific model folders, while the protected_dirs list enables exclusion based on general named subdirectories within any model folder.
+By utilizing these lists, you gain greater control over which files and directories are processed by the script. The `protected_models` list targets specific model folders, while the `protected_dirs` list enables exclusion based on general named subdirectories within any model folder.
 
 Customize these lists according to your specific requirements to ensure that certain files and directories are excluded from the script's operations, providing a more tailored and focused approach to content management.
 
@@ -77,13 +77,13 @@ Customize these lists according to your specific requirements to ensure that cer
 
 ### Usage Note: Initial Configuration for Testing
 
-Before executing the script in a production environment, it is strongly recommended to set both is_dry_run and is_debug parameters to true on your first run. This allows you to observe and understand the impact the script will have on your libraries without making any actual changes.
+Before executing the script in a production environment, it is strongly recommended to set both `is_dry_run` and `is_debug` parameters to `true` on your first run. This allows you to observe and understand the impact the script will have on your libraries without making any actual changes.
 
-By setting is_dry_run to true, the script will simulate the sorting and renaming operations without modifying any files or directories. This enables you to preview the outcome and evaluate if the script aligns with your expectations.
+By setting `is_dry_run` to `true`, the script will simulate the sorting and renaming operations without modifying any files or directories. This enables you to preview the outcome and evaluate if the script aligns with your expectations.
 
-Similarly, setting is_debug to true provides additional logging and debugging information during script execution. This helps in identifying any potential issues or inconsistencies in the script's behavior.
+Similarly, setting `is_debug` to `true` provides additional logging and debugging information during script execution. This helps in identifying any potential issues or inconsistencies in the script's behavior.
 
-Once you have thoroughly reviewed the simulated results and are satisfied with the script's behavior, you can set both is_dry_run and is_debug parameters to false for the actual execution, allowing the script to make the intended changes to your libraries.
+Once you have thoroughly reviewed the simulated results and are satisfied with the script's behavior, you can set both `is_dry_run` and `is_debug` parameters to `false` for the actual execution, allowing the script to make the intended changes to your libraries.
 
 Remember, it is crucial to exercise caution and test the script thoroughly before applying it to your valuable content libraries to ensure a smooth and desirable outcome.
 
@@ -122,27 +122,27 @@ D:\
 
 ### Handling of do_sanitize_filenames
 
-One particular aspect of the script that may be considered as the least desirable is the do_sanitize_filenames parameter, which is set to true by default. This parameter plays a role in sanitizing and cleaning up the filenames during the sorting process.
+One particular aspect of the script that may be considered as the least desirable is the `do_sanitize_filenames` parameter, which is set to true by default. This parameter plays a role in sanitizing and cleaning up the filenames during the sorting process.
 
-However, it is important to note that the do_sanitize_filenames functionality may not align with my personal preferences, as it involves making modifications to the original filenames. This can sometimes lead to a loss of the original naming context or result in unintended changes.
+However, it is important to note that the `do_sanitize_filenames` functionality may not align with my personal preferences, as it involves making modifications to the original filenames. This can sometimes lead to a loss of the original naming context or result in unintended changes.
 
-If preserving the original filenames and avoiding any alterations is a priority for you, it is highly recommended to set the do_sanitize_filenames parameter to false. This will disable the sanitization process, allowing the filenames to remain untouched.
+If preserving the original filenames and avoiding any alterations is a priority for you, it is highly recommended to set the `do_sanitize_filenames` parameter to false. This will disable the sanitization process, allowing the filenames to remain untouched.
 
 ### Handling of do_renames_lowercase
 
-An important consideration in this script is the treatment of the do_renames_lowercase parameter. While the key exists and can be configured, it is essential to note that the script inherently favors lowercase file names. Consequently, even if the do_renames_lowercase parameter is set to false, the file names will still be transformed to lowercase.
+An important consideration in this script is the treatment of the `do_renames_lowercase` parameter. While the key exists and can be configured, it is essential to note that the script inherently favors lowercase file names. Consequently, even if the `do_renames_lowercase` parameter is set to false, the file names will still be transformed to lowercase.
 
 This behavior ensures consistency within the script and promotes conformity to lowercase naming conventions. It's important to be aware of this behavior when working with the script to avoid unexpected outcomes.
 
 ### Handling of do_remove_duplicate_extensions
 
-The do_remove_duplicate_extensions feature addresses the issue of multiple occurrences of file extensions within a filename. When enabled, this functionality attempts to remove redundant file extensions from filenames. For example, filename.jpg.jpg or filenamejpg.jpg would be transformed into filename.jpg. Additionally, cases like 0heu75gekk9f1qxw2mztu_source.mp4_thumbsc69fbac96d57811d.jpg would be modified to 0heu75gekk9f1qxw2mztu_source_thumbsc69fbac96d57811d.jpg.
+The `do_remove_duplicate_extensions` feature addresses the issue of multiple occurrences of file extensions within a filename. When enabled, this functionality attempts to remove redundant file extensions from filenames. For example, `filename.jpg.jpg` or `filenamejpg.jpg` would be transformed into `filename.jpg`. Additionally, cases like `0heu75gekk9f1qxw2mztu_source.mp4_thumbsc69fbac96d57811d.jpg` would be modified to `0heu75gekk9f1qxw2mztu_source_thumbsc69fbac96d57811d.jpg`.
 
 However, it is important to note that enabling this feature carries a level of uncertainty. While it aims to streamline filenames by removing duplicate extensions, it may occasionally lead to unexpected results. Therefore, exercising caution is advised when deciding to enable or disable this feature.
 
 ### File Renaming with Size Mismatch
 
-During the file import or moving process, it's important to be aware of a specific limitation related to file renaming. If the script encounters a situation where it needs to rename a file due to a size mismatch, a naming convention will be applied. In this scenario, the file name will be modified from filename.jpg to filename_duplicate_n.jpg, where n represents the number of attempts made to find a unique file name.
+During the file import or moving process, it's important to be aware of a specific limitation related to file renaming. If the script encounters a situation where it needs to rename a file due to a size mismatch, a naming convention will be applied. In this scenario, the file name will be modified from `filename.jpg` to `filename_duplicate_n.jpg`, where n represents the number of attempts made to find a unique file name.
 
 While this approach ensures that files are properly renamed to avoid conflicts, it does introduce a potential limitation. The original file name may be altered to include the "duplicate" label and an appended number, which could deviate from the desired naming convention or disrupt the intended file organization.
 

@@ -35,6 +35,13 @@ Please take the necessary steps to identify and install the dependencies require
 root_dir: "D:/Content/ISOs"
 completion_json: "D:/Content/index.json"
 history_file: "D:/Content/history/history.json"
+protected_models:
+  - "darshelle stevens"
+  - "jessica nigri"
+protected_dirs:
+  - "premium"
+  - "sorted"
+  - "corrupted"
 ```
 
 ### Locations of completion_json and history_file
@@ -52,6 +59,20 @@ D:\
         ├── angela white\
         └── angie varona\
 ```
+
+### Understanding protected_models and protected_dirs
+
+In this script, the concepts of protected_models and protected_dirs play a vital role in controlling the file processing behavior. Let's explore how these two lists work:
+
+#### protected_models:
+The protected_models list consists of the first-level subdirectories (model folders) located within the root_dir. By adding a model folder name to the protected_models list (e.g., "angela white" or "amilia onyx"), the script ensures that all files and subdirectories within those protected model folders are ignored during processing. Essentially, any content within these protected model folders will be excluded from the script's operations.
+
+#### protected_dirs:
+On the other hand, the protected_dirs list contains general named subdirectories that are not limited to specific model folders. If any model folder contains a subdirectory with a name that matches one of the entries in the protected_dirs list, the script will ignore all files and folders within that specific subdirectory. This allows for selective exclusion of content based on these named subdirectories, regardless of the model folder in which they reside. However, it is essential to include "premium" in the protected_dirs list to prevent potential recursion issues. When "premium" is included in protected_dirs, the script will ignore all files and folders within any "premium" subdirectory, ensuring that recursion is avoided.
+
+By utilizing these lists, you gain greater control over which files and directories are processed by the script. The protected_models list targets specific model folders, while the protected_dirs list enables exclusion based on general named subdirectories within any model folder.
+
+Customize these lists according to your specific requirements to ensure that certain files and directories are excluded from the script's operations, providing a more tailored and focused approach to content management.
 
 ## Usage
 

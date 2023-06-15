@@ -1,0 +1,101 @@
+VERSION: "0.1.3"
+AUTHOR: "ne0liberal"
+ROOT_DIR: "path/to/your/collection/root"
+COMPLETION_JSON: "path/to/save/index.json"
+HISTORY_FILE: "path/to/save/history.json"
+PREMIUM_DIR: "premium"
+IS_DRY_RUN: true
+IS_DEBUG: true
+DO_IMPORTS: true
+DO_RENAMES: true
+DO_RENAMES_LOWERCASE: true
+DO_CONVERTS: true
+DO_SANITIZE_FILENAMES: true
+DO_REMOVE_DUPLICATE_EXTENSIONS: true
+DO_PREMIUM_IMPORTS: true
+DO_LOOSE_FILE_IMPORTS: true
+DO_IMAGE_CONVERTS: true
+DO_VIDEO_CONVERTS: true
+DO_IMPORT_COOMER: true
+DO_IMPORT_FANHOUSE: true
+DO_IMPORT_FANSLY: true
+DO_IMPORT_GUMROAD: true
+DO_IMPORT_ONLYFANS: true
+DO_IMPORT_PATREON: true
+DO_IMPORT_PPV: true
+VALID_FILETYPES:
+  audio:
+    - ".mp3"
+    - ".wav"
+    - ".flac"
+    - ".m4a"
+    - ".aac"
+    - ".ogg"
+  images:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+    - ".tiff"
+    - ".webp"
+    - ".jfif"
+  text:
+    - ".txt"
+    - ".doc"
+    - ".docx"
+    - ".pdf"
+    - ".rtf"
+  misc:
+    - ".zip"
+    - ".rar"
+    - ".7z"
+    - ".torrent"
+    - ".heic"
+    - ".log"
+    - ".db"
+    - ".htm"
+    - ".html"
+    - ".bat"
+    - ".py"
+    - ".db-journal"
+    - ".ini"
+    - ".psd"
+    - ".time"
+  videos:
+    - ".mp4"
+    - ".mkv"
+    - ".mov"
+    - ".m4v"
+    - ".wmv"
+    - ".webm"
+    - ".gif"
+    - ".avi"
+    - ".ts"
+    - ".mpg"
+    - ".flv"
+    - ".mpeg"
+GOAL_VIDEO_EXTENSION:
+  - ".mp4"
+  - ".webm"
+  - ".gif"
+GOAL_IMAGE_EXTENSION:
+  - ".jpg"
+  - ".webp"
+PROTECTED_MODELS:
+  - "darshelle stevens"
+  - "darshelle stevens - fix"
+  - "darshelle - jessica - meg crossovers"
+  - "jessica nigri"
+  - "jessica nigri - fix"
+  - "meg turney"
+  - "meg turney - fix"
+  - "virtual reality (vr)"
+PROTECTED_DIRS:
+  - "corrupted"
+  - "deepfakes"
+  - "favorites"
+  - "fix"
+  - "manual_review"
+  - "premium"
+  - "sorted albums"
+  - "youtube"

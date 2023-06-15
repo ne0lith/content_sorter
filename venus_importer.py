@@ -121,7 +121,7 @@ class FileProcessor:
 
         self.progress_bar = None
         self.file_count = 0
-        self.update_interval = 350
+        self.update_interval = 850
 
         self.excluded_dirs = self.exclude_dirs = self.protected_dirs
         self.excluded_dirs += [self.root_dir / dir for dir in self.protected_models]
@@ -149,6 +149,7 @@ class FileProcessor:
         with pool:
             partial_process_file = partial(self.process_file)
             self.process_directory(self.root_dir, partial_process_file)
+
         self.progress_bar.close()
 
         self.history_instance.save_history()
@@ -196,51 +197,108 @@ class FileProcessor:
         if self.file_count % self.update_interval == 0:
             self.progress_bar.update(self.update_interval)
 
-        if not self.check_protected(file_path):
-            if (
-                file_path.suffix.lower() in self.valid_filetypes["images"]
-                and file_path.suffix.lower() not in self.goal_image_extension
-            ):
-                self.images_to_convert.append(file_path)
+        if (
+            file_path.suffix.lower() in self.valid_filetypes["images"]
+            and file_path.suffix.lower() not in self.goal_image_extension
+        ):
+            self.images_to_convert.append(file_path)
 
-            if (
-                file_path.suffix.lower() in self.valid_filetypes["videos"]
-                and file_path.suffix.lower() not in self.goal_video_extension
-            ):
-                self.videos_to_convert.append(file_path)
+        if (
+            file_path.suffix.lower() in self.valid_filetypes["videos"]
+            and file_path.suffix.lower() not in self.goal_video_extension
+        ):
+            self.videos_to_convert.append(file_path)
 
-            if self.do_converts:
-                if self.do_image_converts:
-                    if file_path in self.images_to_convert:
+        if self.do_converts:
+            if self.do_image_converts:
+                input_path = file_path
+
+                if file_path in self.images_to_convert:
+                    if not self.is_dry_run:
+                        try:
+                            self.convert_to_jpg(file_path)
+                            output_path = file_path.with_suffix(".jpg")
+
+                            if file_path in self.images_to_convert:
+                                self.images_to_convert.remove(file_path)
+
+                            self.actions_history.append(output_path)
+                            file_path = output_path
+                        except Exception as e:
+                            tqdm.write(f"Error: {e}")
+                            self.actions_history.append(file_path)
+                    else:
+                        tqdm.write(f"Would convert {file_path}")
+                        self.actions_history.append(file_path)
+
+            if self.do_video_converts:
+                input_path = file_path
+
+                if "vid" in input_path.suffix:
+                    if not self.is_dry_run:
+                        self.convert_to_mp4(input_path)
+                        output_path = input_path.with_suffix(".mp4")
+                        file_path = output_path
+                    else:
+                        tqdm.write(f"Would rename {file_path} to be {output_path}")
+
+        if self.do_renames:
+            if self.do_renames_lowercase:
+                input_path = file_path
+
+                if input_path.name != input_path.name.lower():
+                    try:
+                        output_path = input_path.parent / input_path.name.lower()
                         if not self.is_dry_run:
-                            try:
-                                self.convert_to_jpg(file_path)
-                                if file_path in self.images_to_convert:
-                                    self.images_to_convert.remove(file_path)
-                                self.actions_history.append(
-                                    file_path.with_suffix(".jpg")
-                                )
-                            except Exception as e:
-                                tqdm.write(f"Error: {e}")
-                                self.actions_history.append(file_path)
+                            self.rename_file(input_path, output_path)
+                            self.actions_history.append(output_path)
+                            file_path = output_path
                         else:
-                            tqdm.write(f"Would convert {file_path}")
+                            tqdm.write(f"Would rename {input_path} to {output_path}\n")
+                    except Exception as e:
+                        tqdm.write(f"Error: {e}\n")
+
+            if self.do_remove_duplicate_extensions:
+                if self.has_duplicate_extensions(file_path):
+                    input_path = file_path
+
+                    output_name = self.remove_duped_extensions(input_path.name)
+                    output_path = input_path.parent / output_name
+
+                    if output_path != file_path:
+                        if not self.is_dry_run:
+                            self.rename_file(input_path, output_path)
+                            self.actions_history.append(output_path)
+                            file_path = output_path
+                        else:
+                            tqdm.write(f"Would rename {file_path} to {output_path}\n")
                             self.actions_history.append(file_path)
 
-                if self.do_video_converts:
-                    if "vid" in file_path.suffix:
-                        if not self.is_dry_run:
-                            self.convert_to_mp4(file_path)
-                        else:
-                            tqdm.write(f"Would rename {file_path} to be .mp4")
+            if not self.check_protected(file_path):
+                if self.do_sanitize_filenames:
+                    input_path = file_path
 
-            if self.do_imports:
+                    file_name_sanitized = self.sanitize_filename(input_path)
+                    output_path = input_path.parent / file_name_sanitized
+
+                    if input_path != output_path:
+                        if not self.is_dry_run:
+                            self.rename_file(input_path, output_path)
+                            self.actions_history.append(output_path)
+                            file_path = output_path
+                        else:
+                            tqdm.write(f"\nWould rename {input_path} to {output_path}")
+                            self.actions_history.append(input_path)
+
+        if self.do_imports:
+            if not self.check_protected(file_path):
                 if self.do_premium_imports:
                     if self.is_premium_file(file_path):
                         model_premium_dir = self.get_model_premium_dir(file_path)
 
-                        if not model_premium_dir.exists():
-                            model_premium_dir.mkdir()
+                        if not self.is_dry_run:
+                            if not model_premium_dir.exists():
+                                model_premium_dir.mkdir()
 
                         input_path = file_path
                         output_path = model_premium_dir / file_path.name
@@ -248,99 +306,47 @@ class FileProcessor:
                         if not self.is_dry_run:
                             self.rename_file(input_path, output_path)
                             self.actions_history.append(output_path)
+                            file_path = output_path
                         else:
                             tqdm.write(f"Would move {input_path} to {output_path}")
 
-            if self.do_renames:
-                if self.do_renames_lowercase:
-                    if file_path.exists():
-                        if file_path.name != file_path.name.lower():
-                            try:
-                                new_file_path = (
-                                    file_path.parent / file_path.name.lower()
-                                )
-                                if not self.is_dry_run:
-                                    file_path.rename(new_file_path)
-                                    tqdm.write(f"Original: {file_path}")
-                                    tqdm.write(f"     New: {new_file_path}\n")
-                                else:
-                                    tqdm.write(
-                                        f"Would rename {file_path} to {new_file_path}\n"
-                                    )
-                            except Exception as e:
-                                tqdm.write(f"Error: {e}\n")
+            if self.do_loose_file_imports:
+                model_dir = self.get_model_name(file_path)
+                model_dir = self.root_dir / model_dir
 
-                if self.do_remove_duplicate_extensions:
-                    if file_path.exists():
-                        if self.has_duplicate_extensions(file_path):
-                            new_filename = self.remove_duped_extensions(file_path.name)
-                            new_file_path = file_path.parent / new_filename
+                if model_dir == file_path.parent and any(
+                    file_path.suffix in filetypes
+                    for filetypes in self.valid_filetypes.values()
+                ):
+                    file_extension = file_path.suffix
+                    subfolder = None
 
-                            if new_file_path != file_path:
-                                if not self.is_dry_run:
-                                    self.rename_file(file_path, new_file_path)
-                                    self.actions_history.append(new_file_path)
-                                else:
-                                    tqdm.write(
-                                        f"Would rename {file_path} to {new_file_path}\n"
-                                    )
-                                    self.actions_history.append(file_path)
+                    for key, filetypes in self.valid_filetypes.items():
+                        if file_extension in filetypes:
+                            subfolder = key
+                            break
 
-                if self.do_sanitize_filenames:
-                    if file_path.exists():
-                        filename_original = file_path
-                        filename_new = self.sanitize_filename(file_path)
-                        if filename_original != filename_new:
-                            if not self.is_dry_run:
-                                self.rename_file(filename_original, filename_new)
-                                self.actions_history.append(filename_new)
-                            else:
-                                tqdm.write(
-                                    f"\nWould rename {filename_original} to {filename_new}"
-                                )
-                                self.actions_history.append(filename_original)
+                    if subfolder is None:
+                        subfolder = "misc"
 
-            if self.do_imports:
-                if self.do_loose_file_imports:
-                    if file_path.exists():
-                        model_dir = self.get_model_name(file_path)
-                        model_dir = self.root_dir / model_dir
+                    subdir_path = model_dir / subfolder
 
-                        if model_dir == file_path.parent and any(
-                            file_path.suffix in filetypes
-                            for filetypes in self.valid_filetypes.values()
-                        ):
-                            file_extension = file_path.suffix
-                            subfolder = None
+                    if not subdir_path.exists():
+                        if not self.is_dry_run:
+                            subdir_path.mkdir()
+                            self.actions_history.append(subdir_path)
+                        else:
+                            tqdm.write(f"\nWould create {subdir_path}")
 
-                            for key, filetypes in self.valid_filetypes.items():
-                                if file_extension in filetypes:
-                                    subfolder = key
-                                    break
+                    input_path = file_path
+                    output_path = subdir_path / file_path.name
 
-                            if subfolder is None:
-                                subfolder = "misc"
-
-                            subdir_path = model_dir / subfolder
-
-                            if not subdir_path.exists():
-                                if not self.is_dry_run:
-                                    subdir_path.mkdir()
-                                    self.actions_history.append(subdir_path)
-                                else:
-                                    tqdm.write(f"Would create {subdir_path}")
-
-                            input_path = file_path
-                            output_path = subdir_path / file_path.name
-
-                            if not self.is_dry_run:
-                                output_path = self.get_unique_file_path(output_path)
-                                self.rename_file(input_path, output_path)
-                                self.actions_history.append(output_path)
-                            else:
-                                tqdm.write(
-                                    f"\nWould move {input_path} to {output_path}"
-                                )
+                    if not self.is_dry_run:
+                        self.rename_file(input_path, output_path)
+                        self.actions_history.append(output_path)
+                        file_path = output_path
+                    else:
+                        tqdm.write(f"\nWould move {input_path} to {output_path}")
 
     def process_directory(self, dir_path, partial_func):
         for entry in os.scandir(dir_path):
@@ -454,7 +460,7 @@ class FileProcessor:
                 )
 
             def is_video(file_path):
-                pattern = r"[a-z0-9]{21}(_source|_720p|_1080p)"
+                pattern = r"[a-z0-9]{21}(_source|_480p|_720p|_1080p)"
                 return (
                     re.search(pattern, file_path.stem)
                     and file_path.suffix.lower() in self.valid_filetypes["videos"]

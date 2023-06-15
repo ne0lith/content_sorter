@@ -250,15 +250,18 @@ class FileProcessor:
                             tqdm.write(f"Would move {input_path} to {output_path}")
 
             if self.do_renames:
-                if file_path.exists():
-                    if file_path.name != file_path.name.lower():
-                        try:
-                            new_file_path = file_path.parent / file_path.name.lower()
-                            file_path.rename(new_file_path)
-                            tqdm.write(f"Original: {file_path}")
-                            tqdm.write(f"     New: {new_file_path}\n")
-                        except Exception as e:
-                            tqdm.write(f"Error: {e}\n")
+                if self.do_renames_lowercase:
+                    if file_path.exists():
+                        if file_path.name != file_path.name.lower():
+                            try:
+                                new_file_path = (
+                                    file_path.parent / file_path.name.lower()
+                                )
+                                file_path.rename(new_file_path)
+                                tqdm.write(f"Original: {file_path}")
+                                tqdm.write(f"     New: {new_file_path}\n")
+                            except Exception as e:
+                                tqdm.write(f"Error: {e}\n")
 
                 if self.do_remove_duplicate_extensions:
                     if file_path.exists():

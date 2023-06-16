@@ -154,7 +154,7 @@ This project focuses on enhancing the import scheme for popular fan platforms, i
 
 To overcome this challenge, I am actively refining the import process to provide broader support for various file naming schemes across these platforms. Notably, I have encountered no issues with platforms like OnlyFans and Coomerparty. Additionally, I have implemented a fallback mechanism that references the site name within the file for OnlyFans.
 
-The objective is to ensure a seamless and reliable import experience by accommodating the unique file naming conventions of different fan platforms. I appreciate any interest and would love if anyone decided to contribute to the project and provide feedback to enhance the functionality and usability of the import scheme.
+The objective is to ensure a seamless and reliable import experience by accommodating the unique file naming conventions of different fan platforms.
 
 ```python
 def is_coomer_file(file_path):

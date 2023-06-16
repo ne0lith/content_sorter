@@ -231,7 +231,7 @@ class FileProcessor:
         if self.do_converts:
             if self.do_image_converts:
                 input_path = file_path
-                if "png" in input_path.suffix or "jfif" in input_path.suffix:
+                if input_path.suffix.lower() in [".jpeg", ".png", ".jfif"]:
                     try:
                         self.convert_to_jpg(file_path)
                         output_path = file_path.with_suffix(".jpg")
@@ -240,7 +240,8 @@ class FileProcessor:
                         if not self.is_dry_run:
                             file_path = output_path
                     except Exception as e:
-                        tqdm.write(f"Error: {e}")
+                        tqdm.write(input_path.name)
+                        tqdm.write(f"Error: {e}\n")
 
             if self.do_video_converts:
                 input_path = file_path
@@ -262,6 +263,7 @@ class FileProcessor:
                         if not self.is_dry_run:
                             file_path = output_path
                     except Exception as e:
+                        tqdm.write(input_path)
                         tqdm.write(f"Error: {e}\n")
 
             if self.do_remove_duplicate_extensions:
@@ -559,6 +561,7 @@ class FileProcessor:
                     if image.mode == "RGBA":
                         image = image.convert("RGB")
 
+                    input_path = file_path
                     output_path = file_path.with_suffix(".jpg")
                     output_path = self.get_unique_file_path(output_path)
                     image.save(output_path, "JPEG", quality=100)
@@ -574,14 +577,16 @@ class FileProcessor:
                         if file_path in self.images_to_convert:
                             self.images_to_convert.remove(file_path)
                     else:
+                        tqdm.write(input_path)
                         tqdm.write(
                             "Error occurred during conversion. Original file not deleted.\n"
                         )
                         if output_path.is_file():
                             output_path.unlink()
                 except Exception as e:
+                    tqdm.write(input_path)
                     tqdm.write(
-                        "Error occurred during conversion. Original file not deleted.\n"
+                        "Error occurred during conversion. Original file not deleted."
                     )
                     tqdm.write(f"Error message: {str(e)}\n")
                     if output_path.is_file():

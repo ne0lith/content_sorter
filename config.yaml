@@ -83,22 +83,10 @@ goal_image_extension:
   - ".webp"
 protected_models:
   - "darshelle stevens"
-  - "darshelle stevens - fix"
-  - "darshelle - jessica - meg crossovers"
   - "jessica nigri"
-  - "jessica nigri - fix"
   - "meg turney"
-  - "meg turney - fix"
-  - "virtual reality (vr)"
 protected_dirs:
-  - "corrupted"
-  - "deepfakes"
-  - "favorites"
-  - "fix"
-  - "manual_review"
   - "premium"
-  - "sorted albums"
-  - "youtube"
 ascii_art: |
 
     :::     ::: :::::::::: ::::    ::: :::    :::  ::::::::  

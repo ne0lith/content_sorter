@@ -123,11 +123,9 @@ class FileProcessor:
         self.file_count = 0
         self.update_interval = 850
 
-        self.excluded_dirs = self.exclude_dirs = (
-            self.protected_dirs
-            + [self.premium_dir]
-            + [self.root_dir / dir for dir in self.protected_models]
-        )
+        self.excluded_dirs = self.exclude_dirs = self.protected_dirs + [
+            self.root_dir / dir for dir in self.protected_models
+        ]
 
         self.result_dict = dict()
         self.videos_to_convert = list()
@@ -233,32 +231,25 @@ class FileProcessor:
         if self.do_converts:
             if self.do_image_converts:
                 input_path = file_path
-
-                if file_path in self.images_to_convert:
-                    if not self.is_dry_run:
-                        try:
-                            self.convert_to_jpg(file_path)
-                            output_path = file_path.with_suffix(".jpg")
-
-                            if file_path in self.images_to_convert:
-                                self.images_to_convert.remove(file_path)
-
+                if "png" in input_path.suffix or "jfif" in input_path.suffix:
+                    try:
+                        self.convert_to_jpg(file_path)
+                        output_path = file_path.with_suffix(".jpg")
+                        if file_path in self.images_to_convert:
+                            self.images_to_convert.remove(file_path)
+                        if not self.is_dry_run:
                             file_path = output_path
-                        except Exception as e:
-                            tqdm.write(f"Error: {e}")
-                    else:
-                        tqdm.write(f"Would convert {file_path}")
+                    except Exception as e:
+                        tqdm.write(f"Error: {e}")
 
             if self.do_video_converts:
                 input_path = file_path
 
                 if "vid" in input_path.suffix:
+                    self.convert_to_mp4(input_path)
                     if not self.is_dry_run:
-                        self.convert_to_mp4(input_path)
                         output_path = input_path.with_suffix(".mp4")
                         file_path = output_path
-                    else:
-                        tqdm.write(f"Would rename {file_path} to be {output_path}")
 
         if self.do_renames:
             if self.do_renames_lowercase:
@@ -267,11 +258,9 @@ class FileProcessor:
                 if input_path.name != input_path.name.lower():
                     try:
                         output_path = input_path.parent / input_path.name.lower()
+                        self.rename_file(input_path, output_path)
                         if not self.is_dry_run:
-                            self.rename_file(input_path, output_path)
                             file_path = output_path
-                        else:
-                            tqdm.write(f"Would rename {input_path} to {output_path}\n")
                     except Exception as e:
                         tqdm.write(f"Error: {e}\n")
 
@@ -283,11 +272,9 @@ class FileProcessor:
                     output_path = input_path.parent / output_name
 
                     if output_path != file_path:
+                        self.rename_file(input_path, output_path)
                         if not self.is_dry_run:
-                            self.rename_file(input_path, output_path)
                             file_path = output_path
-                        else:
-                            tqdm.write(f"Would rename {file_path} to {output_path}\n")
 
             if not self.check_protected(file_path):
                 if self.do_sanitize_filenames:
@@ -297,17 +284,18 @@ class FileProcessor:
                     output_path = input_path.parent / file_name_sanitized
 
                     if input_path != output_path:
+                        self.rename_file(input_path, output_path)
                         if not self.is_dry_run:
-                            self.rename_file(input_path, output_path)
                             file_path = output_path
-                        else:
-                            tqdm.write(f"\nWould rename {input_path} to {output_path}")
 
         if self.do_imports:
             if not self.check_protected(file_path):
                 if self.do_premium_imports:
                     if self.is_premium_file(file_path):
                         model_premium_dir = self.get_model_premium_dir(file_path)
+
+                        if model_premium_dir == file_path.parent:
+                            return
 
                         if not self.is_dry_run:
                             if not model_premium_dir.exists():
@@ -316,11 +304,9 @@ class FileProcessor:
                         input_path = file_path
                         output_path = model_premium_dir / file_path.name
 
+                        self.rename_file(input_path, output_path)
                         if not self.is_dry_run:
-                            self.rename_file(input_path, output_path)
                             file_path = output_path
-                        else:
-                            tqdm.write(f"Would move {input_path} to {output_path}")
 
             if self.do_loose_file_imports:
                 model_dir = self.get_model_name(file_path)
@@ -347,16 +333,14 @@ class FileProcessor:
                         if not self.is_dry_run:
                             subdir_path.mkdir()
                         else:
-                            tqdm.write(f"\nWould create {subdir_path}")
+                            tqdm.write(f"Would create {subdir_path}\n")
 
                     input_path = file_path
                     output_path = subdir_path / file_path.name
 
+                    self.rename_file(input_path, output_path)
                     if not self.is_dry_run:
-                        self.rename_file(input_path, output_path)
                         file_path = output_path
-                    else:
-                        tqdm.write(f"\nWould move {input_path} to {output_path}")
 
         if (
             file_path.suffix.lower() in self.valid_filetypes["images"]
@@ -402,7 +386,7 @@ class FileProcessor:
 
                 if skip_directory:
                     if self.is_debug:
-                        tqdm.write(f"Skipping {entry.path}")
+                        tqdm.write(f"Skipping {entry.path}\n")
                     continue
 
                 self.process_directory(entry.path, partial_func)
@@ -568,39 +552,44 @@ class FileProcessor:
             return
 
         if file_path.suffix.lower() in [".png", ".jfif"]:
-            try:
-                image = Image.open(file_path)
+            if not self.is_dry_run:
+                try:
+                    image = Image.open(file_path)
 
-                if image.mode == "RGBA":
-                    image = image.convert("RGB")
+                    if image.mode == "RGBA":
+                        image = image.convert("RGB")
 
-                output_path = file_path.with_suffix(".jpg")
-                output_path = self.get_unique_file_path(output_path)
-                image.save(output_path, "JPEG", quality=100)
-
-                if file_path in self.images_to_convert:
-                    self.images_to_convert.remove(file_path)
-
-                if output_path.is_file() and output_path.stat().st_size > 0:
-                    tqdm.write(f"Original: {file_path}")
-                    tqdm.write(f"     New: {output_path}\n")
-                    file_path.unlink()
+                    output_path = file_path.with_suffix(".jpg")
+                    output_path = self.get_unique_file_path(output_path)
+                    image.save(output_path, "JPEG", quality=100)
 
                     if file_path in self.images_to_convert:
                         self.images_to_convert.remove(file_path)
-                else:
+
+                    if output_path.is_file() and output_path.stat().st_size > 0:
+                        tqdm.write(f"Original: {file_path}")
+                        tqdm.write(f"     New: {output_path}\n")
+                        file_path.unlink()
+
+                        if file_path in self.images_to_convert:
+                            self.images_to_convert.remove(file_path)
+                    else:
+                        tqdm.write(
+                            "Error occurred during conversion. Original file not deleted.\n"
+                        )
+                        if output_path.is_file():
+                            output_path.unlink()
+                except Exception as e:
                     tqdm.write(
                         "Error occurred during conversion. Original file not deleted.\n"
                     )
+                    tqdm.write(f"Error message: {str(e)}\n")
                     if output_path.is_file():
                         output_path.unlink()
-            except Exception as e:
-                tqdm.write(
-                    "Error occurred during conversion. Original file not deleted.\n"
-                )
-                tqdm.write(f"Error message: {str(e)}\n")
-                if output_path.is_file():
-                    output_path.unlink()
+            else:
+                tqdm.write(" Dry run:")
+                tqdm.write(f"Original: {file_path}")
+                tqdm.write(f"     New: {output_path}\n")
 
         else:
             tqdm.write("File is not a PNG or JFIF.\n")
@@ -666,43 +655,50 @@ class FileProcessor:
     def rename_file(self, input_path: Path, output_path: Path):
         input_path = Path(input_path)
         output_path = Path(output_path)
+
+        if input_path == output_path:
+            return
+
         output_path = output_path.parent / output_path.name.lower()
 
         if not self.validate_path(input_path, expect="file"):
             tqdm.write(f"Invalid file path: {input_path}\n")
             return
 
-        try:
-            if not self.is_dry_run:
+        if not self.is_dry_run:
+            try:
                 input_path.rename(output_path)
                 self.history_instance.append_to_history(input_path, output_path)
-            else:
-                tqdm.write("Status: Dry run")
 
+                tqdm.write(f"Original: {input_path}")
+                tqdm.write(f"     New: {output_path}\n")
+
+            except FileExistsError:
+                input_size = input_path.stat().st_size
+                output_size = output_path.stat().st_size
+
+                if input_size == output_size:
+                    input_path.unlink()
+                    tqdm.write("File already exists.")
+                    tqdm.write(f"Deleted duplicate file: {input_path}\n")
+                    return
+                else:
+                    potential_output_path = self.get_unique_file_path(output_path)
+                    if (
+                        potential_output_path != input_path
+                        and potential_output_path != output_path
+                    ):
+                        self.rename_file(input_path, potential_output_path)
+
+            except Exception as e:
+                traceback.print_exc()
+                tqdm.write(f"Could not rename {input_path}: {e}\n")
+                input("Press enter to continue...")
+
+        else:
+            tqdm.write(" Dry run:")
             tqdm.write(f"Original: {input_path}")
             tqdm.write(f"     New: {output_path}\n")
-
-        except FileExistsError:
-            input_size = input_path.stat().st_size
-            output_size = output_path.stat().st_size
-
-            if input_size == output_size:
-                input_path.unlink()
-                tqdm.write("File already exists.")
-                tqdm.write(f"Deleted duplicate file: {input_path}\n")
-                return
-            else:
-                potential_output_path = self.get_unique_file_path(output_path)
-                if (
-                    potential_output_path != input_path
-                    and potential_output_path != output_path
-                ):
-                    self.rename_file(input_path, potential_output_path)
-
-        except Exception as e:
-            traceback.print_exc()
-            tqdm.write(f"Could not rename {input_path}: {e}\n")
-            input("Press enter to continue...")
 
     def export_dict(self, output_path: Path, result_dict=None):
         with open(output_path, "w") as f:

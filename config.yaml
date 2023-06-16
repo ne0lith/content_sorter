@@ -96,6 +96,7 @@ protected_dirs:
   - "favorites"
   - "fix"
   - "manual_review"
+  - "premium"
   - "sorted albums"
   - "youtube"
 ascii_art: |

@@ -1,4 +1,4 @@
-version: "0.1.6"
+version: "0.2.1"
 author: "ne0liberal"
 root_dir: "D:/Content/ISOs"
 completion_json: "D:/Content/index.json"
@@ -10,12 +10,12 @@ do_imports: true
 do_renames: true
 do_renames_lowercase: true
 do_converts: true
-do_sanitize_filenames: false # destructive
-do_remove_duplicate_extensions: true # destructive
+do_sanitize_filenames: false
+do_remove_duplicate_extensions: true
 do_premium_imports: true
 do_loose_file_imports: true
 do_image_converts: true
-do_video_converts: true
+do_video_converts: false
 do_import_coomer: true
 do_import_fanhouse: true
 do_import_fansly: true

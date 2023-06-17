@@ -8,35 +8,18 @@ import uuid
 import yaml
 import emoji
 import shutil
+import ffmpeg
 import fnmatch
 import datetime
 import builtins
 import traceback
+import subprocess
 from PIL import Image
 from tqdm import tqdm
 from pathlib import Path
 from functools import partial
 from multiprocessing import Pool
 from sanitize_filename import sanitize
-
-
-class Config:
-    def __init__(self):
-        self.config_path = Path(__file__).parent / "config.yaml"
-        self.load_config()
-
-    def load_config(self):
-        with open(self.config_path, "r") as f:
-            self.config = yaml.safe_load(f)
-
-    def get_value(self, key):
-        value = self.config.get(key)
-        if key in ["root_dir", "completion_json", "history_file"]:
-            value = Path(value)
-        return value
-
-    def set_value(self, key, value):
-        self.config[key] = value
 
 
 class CustomEnvironment:
@@ -61,11 +44,11 @@ class CustomEnvironment:
         self.original_print(*modified_args, **kwargs)
 
     def custom_input(self, prompt=""):
-        modified_prompt = "    " + prompt
+        modified_prompt = "    " + str(prompt)
         return self.original_input(modified_prompt)
 
     def custom_write(self, s, *args, **kwargs):
-        modified_s = "    " + s
+        modified_s = "    " + str(s)
         self.original_write(modified_s, *args, **kwargs)
 
     def restore(self):
@@ -73,6 +56,25 @@ class CustomEnvironment:
         builtins.input = self.original_input
         tqdm.write = self.original_write
         sys.stdout.write("\033[?25h")
+
+
+class Config:
+    def __init__(self):
+        self.config_path = Path(__file__).parent / "config.yaml"
+        self.load_config()
+
+    def load_config(self):
+        with open(self.config_path, "r") as f:
+            self.config = yaml.safe_load(f)
+
+    def get_value(self, key):
+        value = self.config.get(key)
+        if key in ["root_dir", "completion_json", "history_file"]:
+            value = Path(value)
+        return value
+
+    def set_value(self, key, value):
+        self.config[key] = value
 
 
 class History:
@@ -110,6 +112,140 @@ class History:
             shutil.copy(self.history_file, self.history_file.with_suffix(".bak"))
 
 
+class VideoConverter:
+    def __init__(self):
+        self.conversion_success = False
+        self.is_mp4 = False
+
+    def copy(self, input_file, output_file):
+        try:
+            input_stream = ffmpeg.input(str(input_file))
+            output_stream = ffmpeg.output(
+                input_stream, str(output_file), vcodec="copy", acodec="copy"
+            )
+            cmd = ffmpeg.compile(output_stream, overwrite_output=True)
+            with subprocess.Popen(
+                cmd, stderr=subprocess.PIPE, universal_newlines=True
+            ) as p:  # noqa F841
+                while True:
+                    total_time = 0
+                    tqdm.write(f"           {total_time}", end="\r")
+                    time.sleep(0.5)
+                    total_time += 0.5
+                    if self.is_valid_mp4(output_file):
+                        self.conversion_success = True
+                        self.is_mp4 = True
+                        break
+                    else:
+                        self.conversion_success = False
+                        self.is_mp4 = False
+
+        except ffmpeg.Error as e:
+            tqdm.write(f"An error occurred during video copying of {input_file}")
+            tqdm.write(e.stderr + "\n")
+            self.conversion_success = False
+            self.is_mp4 = False
+
+    def convert(self, input_file, output_file):
+        try:
+            input_stream = ffmpeg.input(str(input_file))
+            output_stream = ffmpeg.output(
+                input_stream,
+                str(output_file),
+                **self.get_output_codec_options(input_file),
+            )
+            cmd = ffmpeg.compile(output_stream, overwrite_output=True)
+            with subprocess.Popen(
+                cmd, stderr=subprocess.PIPE, universal_newlines=True
+            ) as p:  # noqa F841
+                while True:
+                    total_time = 0
+                    tqdm.write(f"           {total_time}", end="\r")
+                    time.sleep(0.5)
+                    total_time += 0.5
+                    if self.is_valid_mp4(output_file):
+                        self.conversion_success = True
+                        self.is_mp4 = True
+                        break
+                    else:
+                        self.conversion_success = False
+                        self.is_mp4 = False
+
+        except ffmpeg.Error as e:
+            tqdm.write(f"An error occurred during video conversion of {input_file}")
+            tqdm.write({e.stderr} + "\n")
+            self.conversion_success = False
+            self.is_mp4 = False
+
+    def copy_or_convert(self, input_file, output_file):
+        self.conversion_success = False
+        self.is_mp4 = False
+
+        input_file_path = Path(input_file)
+        output_file_path = Path(output_file)
+
+        ext = input_file_path.suffix.lower()[1:]
+
+        if ext in ["avi", "m4v", "mkv", "mov", "mpeg", "ts", "wmv"]:
+            self.copy(input_file_path, output_file_path)
+            if not self.conversion_success:
+                self.convert(input_file_path, output_file_path)
+        else:
+            tqdm.write(f"Unsupported input file format: {ext}\n")
+
+    def is_valid_mp4(self, file_path):
+        try:
+            result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_format",
+                    "-of",
+                    "json",
+                    str(file_path),
+                ],
+                capture_output=True,
+            )
+            output = result.stdout.decode("utf-8")
+            json_output = json.loads(output)
+            if "format" in json_output:
+                format_info = json_output["format"]
+                if (
+                    "format_name" in format_info
+                    and format_info["format_name"] == "mov,mp4,m4a,3gp,3g2,mj2"
+                ):
+                    return True
+
+        except Exception as e:
+            tqdm.write(
+                f"An error occurred while checking the validity of the MP4 file: {e}\n"
+            )
+
+        return False
+
+    def get_output_codec_options(self, input_file):
+        ext = Path(input_file).suffix.lower()[1:]
+
+        if ext == "avi":
+            return {"vcodec": "libx264", "acodec": "aac"}
+        elif ext == "m4v":
+            return {"vcodec": "copy", "acodec": "copy"}
+        elif ext == "mkv":
+            return {"vcodec": "copy", "acodec": "copy"}
+        elif ext == "mov":
+            return {"vcodec": "copy", "acodec": "copy"}
+        elif ext == "mpeg":
+            return {"vcodec": "mpeg2video", "acodec": "copy"}
+        elif ext == "ts":
+            return {"vcodec": "copy", "acodec": "copy"}
+        elif ext == "wmv":
+            # return {"vcodec": "wmv2", "acodec": "wmav2"}
+            return {"vcodec": "libx264", "acodec": "aac"}
+
+        return {}
+
+
 class FileProcessor:
     def __init__(self, num_processes):
         self.num_processes = num_processes
@@ -118,6 +254,7 @@ class FileProcessor:
         for key in self.config.config.keys():
             setattr(self, key, self.config.get_value(key))
         self.history_instance = History(self.history_file)
+        self.converter_instance = VideoConverter()
 
         self.progress_bar = None
         self.file_count = 0
@@ -130,6 +267,7 @@ class FileProcessor:
         self.result_dict = dict()
         self.videos_to_convert = list()
         self.images_to_convert = list()
+        self.files_touched = list()
 
         self.ascii_art = "\n".join(
             ["    " + line for line in self.ascii_art.split("\n")]
@@ -160,9 +298,18 @@ class FileProcessor:
 
         total_time = time.time() - start_time
 
+        if len(self.files_touched) > 0:
+            print()
         print("-----------------------------------\n\n")
         print(f"Total time: {total_time:.2f} seconds")
         print(f"Total files: {self.file_count}\n\n")
+
+        self.videos_to_convert = [
+            video for video in self.videos_to_convert if video.exists()
+        ]
+        self.images_to_convert = [
+            image for image in self.images_to_convert if image.exists()
+        ]
 
         if self.videos_to_convert:
             amnt = f"Videos to convert: ({len(self.videos_to_convert)})"
@@ -228,29 +375,72 @@ class FileProcessor:
         input("Press any key to exit...")
 
     def process_file(self, file_path):
+        if ".part" in file_path.name or ".part" in file_path.suffix:
+            return
+
         if self.do_converts:
             if self.do_image_converts:
-                input_path = file_path
+                input_path = Path(file_path)
                 if input_path.suffix.lower() in [".jpeg", ".png", ".jfif"]:
                     try:
-                        self.convert_to_jpg(file_path)
-                        output_path = file_path.with_suffix(".jpg")
-                        if file_path in self.images_to_convert:
-                            self.images_to_convert.remove(file_path)
+                        self.convert_to_jpg(input_path)
                         if not self.is_dry_run:
-                            file_path = output_path
+                            file_path = input_path.with_suffix(".jpg")
                     except Exception as e:
                         tqdm.write(input_path.name)
+                        tqdm.write(traceback.format_exc())
                         tqdm.write(f"Error: {e}\n")
 
             if self.do_video_converts:
                 input_path = file_path
+                input_path = Path(input_path)
+                output_path = input_path.with_suffix(".mp4")
+
+                acceptable_input_types = [
+                    ".avi",
+                    ".m4v",
+                    ".mkv",
+                    ".mov",
+                    ".mpeg",
+                    ".ts",
+                    ".wmv",
+                ]
 
                 if "vid" in input_path.suffix:
-                    self.convert_to_mp4(input_path)
                     if not self.is_dry_run:
-                        output_path = input_path.with_suffix(".mp4")
+                        self.convert_to_mp4(input_path)
                         file_path = output_path
+
+                if input_path.suffix.lower() in acceptable_input_types:
+                    if output_path.exists():
+                        output_path = self.get_unique_file_path(output_path)
+
+                    if not self.is_dry_run:
+                        tqdm.write(f"    Found: {input_path.name}")
+                        self.converter_instance.copy_or_convert(input_path, output_path)
+                        if self.converter_instance.conversion_success:
+                            if self.converter_instance.is_mp4:
+                                tqdm.write(f" Original: {input_path}")
+                                tqdm.write(f"      New: {output_path}\n")
+                                file_path = output_path
+                                if input_path.exists():
+                                    input_path.unlink()
+                                    self.files_touched.append(output_path)
+                            else:
+                                tqdm.write(f"Original: {input_path}")
+                                tqdm.write("     New: Failed to convert.\n")
+                                if output_path.exists():
+                                    output_path.unlink()
+                        else:
+                            tqdm.write(f"Original: {input_path}")
+                            tqdm.write("     New: Failed to convert.\n")
+                            if output_path.exists():
+                                output_path.unlink()
+
+                    else:
+                        tqdm.write(" Dry run:")
+                        tqdm.write(f"Original: {input_path}")
+                        tqdm.write(f"     New: {output_path}\n")
 
         if self.do_renames:
             if self.do_renames_lowercase:
@@ -554,11 +744,12 @@ class FileProcessor:
             return
 
         if file_path.suffix.lower() in [".png", ".jfif"]:
+            file_path = Path(file_path)
             if not self.is_dry_run:
                 try:
                     image = Image.open(file_path)
 
-                    if image.mode == "RGBA":
+                    if image.mode in ["RGBA", "P"]:
                         image = image.convert("RGB")
 
                     input_path = file_path
@@ -566,16 +757,11 @@ class FileProcessor:
                     output_path = self.get_unique_file_path(output_path)
                     image.save(output_path, "JPEG", quality=100)
 
-                    if file_path in self.images_to_convert:
-                        self.images_to_convert.remove(file_path)
-
                     if output_path.is_file() and output_path.stat().st_size > 0:
                         tqdm.write(f"Original: {file_path}")
                         tqdm.write(f"     New: {output_path}\n")
                         file_path.unlink()
-
-                        if file_path in self.images_to_convert:
-                            self.images_to_convert.remove(file_path)
+                        self.files_touched.append(output_path)
                     else:
                         tqdm.write(input_path)
                         tqdm.write(
@@ -595,7 +781,6 @@ class FileProcessor:
                 tqdm.write(" Dry run:")
                 tqdm.write(f"Original: {file_path}")
                 tqdm.write(f"     New: {output_path}\n")
-
         else:
             tqdm.write("File is not a PNG or JFIF.\n")
             self.images_to_convert.append(file_path)
@@ -677,6 +862,7 @@ class FileProcessor:
 
                 tqdm.write(f"Original: {input_path}")
                 tqdm.write(f"     New: {output_path}\n")
+                self.files_touched.append(output_path)
 
             except FileExistsError:
                 input_size = input_path.stat().st_size

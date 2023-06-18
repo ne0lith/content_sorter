@@ -3,23 +3,19 @@ import re
 import sys
 import json
 import time
-import ftfy
 import uuid
 import yaml
-import emoji
 import shutil
-import ffmpeg
+import codecs
 import fnmatch
 import datetime
 import builtins
 import traceback
-import subprocess
 from PIL import Image
 from tqdm import tqdm
-from pathlib import Path
 from functools import partial
 from multiprocessing import Pool
-from sanitize_filename import sanitize
+from pathlib import Path, WindowsPath
 
 
 class CustomEnvironment:
@@ -108,8 +104,17 @@ class History:
             json.dump(self.history, f, indent=4)
 
     def backup_history(self):
+        history_file_backup = self.history_file.with_suffix(".bak")
+
         if self.history_file.exists():
-            shutil.copy(self.history_file, self.history_file.with_suffix(".bak"))
+            if not history_file_backup.exists():
+                shutil.copy(self.history_file, history_file_backup)
+            else:
+                if (
+                    self.history_file.stat().st_size
+                    > history_file_backup.stat().st_size
+                ):
+                    shutil.copy(self.history_file, history_file_backup)
 
 
 class VideoConverter:
@@ -118,6 +123,9 @@ class VideoConverter:
         self.is_mp4 = False
 
     def copy(self, input_file, output_file):
+        import ffmpeg
+        import subprocess
+
         try:
             input_stream = ffmpeg.input(str(input_file))
             output_stream = ffmpeg.output(
@@ -147,6 +155,9 @@ class VideoConverter:
             self.is_mp4 = False
 
     def convert(self, input_file, output_file):
+        import ffmpeg
+        import subprocess
+
         try:
             input_stream = ffmpeg.input(str(input_file))
             output_stream = ffmpeg.output(
@@ -194,6 +205,8 @@ class VideoConverter:
             tqdm.write(f"Unsupported input file format: {ext}\n")
 
     def is_valid_mp4(self, file_path):
+        import subprocess
+
         try:
             result = subprocess.run(
                 [
@@ -253,14 +266,17 @@ class FileProcessor:
         self.config = Config()
         for key in self.config.config.keys():
             setattr(self, key, self.config.get_value(key))
+
         self.history_instance = History(self.history_file)
-        self.converter_instance = VideoConverter()
+
+        if self.do_video_converts:
+            self.converter_instance = VideoConverter()
 
         self.progress_bar = None
         self.file_count = 0
         self.update_interval = 850
 
-        self.excluded_dirs = self.exclude_dirs = self.protected_dirs + [
+        self.excluded_dirs = self.protected_dirs + [
             self.root_dir / dir for dir in self.protected_models
         ]
 
@@ -275,6 +291,10 @@ class FileProcessor:
         print("\n" + self.ascii_art + "\n\n")
         print(f"Version: {self.version}")
         print(f" Author: {self.author}\n\n")
+
+        if self.show_params:
+            self.display_params()
+            print()
 
     def crawl_root(self):
         start_time = time.time()
@@ -303,13 +323,6 @@ class FileProcessor:
         print("-----------------------------------\n\n")
         print(f"Total time: {total_time:.2f} seconds")
         print(f"Total files: {self.file_count}\n\n")
-
-        self.videos_to_convert = [
-            video for video in self.videos_to_convert if video.exists()
-        ]
-        self.images_to_convert = [
-            image for image in self.images_to_convert if image.exists()
-        ]
 
         if self.videos_to_convert:
             amnt = f"Videos to convert: ({len(self.videos_to_convert)})"
@@ -374,188 +387,217 @@ class FileProcessor:
         print()
         input("Press any key to exit...")
 
-    def process_file(self, file_path):
-        if ".part" in file_path.name or ".part" in file_path.suffix:
+    def _process_image_converts(self, file_path):
+        if not self.do_image_converts:
             return
 
-        if self.do_converts:
-            if self.do_image_converts:
-                input_path = Path(file_path)
-                if input_path.suffix.lower() in [".jpeg", ".png", ".jfif"]:
-                    try:
-                        self.convert_to_jpg(input_path)
-                        if not self.is_dry_run:
-                            file_path = input_path.with_suffix(".jpg")
-                    except Exception as e:
-                        tqdm.write(input_path.name)
-                        tqdm.write(traceback.format_exc())
-                        tqdm.write(f"Error: {e}\n")
+        input_path = Path(file_path)
 
-            if self.do_video_converts:
-                input_path = file_path
-                input_path = Path(input_path)
-                output_path = input_path.with_suffix(".mp4")
+        if input_path.suffix.lower() in [".jpeg", ".png", ".jfif"]:
+            self.convert_to_jpg(input_path)
+            if not self.is_dry_run:
+                file_path = input_path.with_suffix(".jpg")
 
-                acceptable_input_types = [
-                    ".avi",
-                    ".m4v",
-                    ".mkv",
-                    ".mov",
-                    ".mpeg",
-                    ".ts",
-                    ".wmv",
-                ]
+    def _process_video_converts(self, file_path):
+        if not self.do_video_converts:
+            return
 
-                if "vid" in input_path.suffix:
-                    if not self.is_dry_run:
-                        self.convert_to_mp4(input_path)
+        input_path = Path(file_path)
+        output_path = input_path.with_suffix(".mp4")
+
+        if output_path.exists():
+            output_path = self.get_unique_file_path(output_path)
+
+        acceptable_input_types = [
+            ".avi",
+            ".m4v",
+            ".mkv",
+            ".mov",
+            ".mpeg",
+            ".ts",
+            ".wmv",
+        ]
+
+        if "vid" in input_path.suffix:
+            if not self.is_dry_run:
+                self.convert_to_mp4(input_path)
+                file_path = output_path
+
+        if input_path.suffix.lower() in acceptable_input_types:
+            if output_path.exists():
+                output_path = self.get_unique_file_path(output_path)
+
+            if not self.is_dry_run:
+                tqdm.write(f"    Found: {input_path.name}")
+                self.converter_instance.copy_or_convert(input_path, output_path)
+                if self.converter_instance.conversion_success:
+                    if self.converter_instance.is_mp4:
+                        tqdm.write(f" Original: {input_path}")
+                        tqdm.write(f"      New: {output_path}\n")
                         file_path = output_path
-
-                if input_path.suffix.lower() in acceptable_input_types:
-                    if output_path.exists():
-                        output_path = self.get_unique_file_path(output_path)
-
-                    if not self.is_dry_run:
-                        tqdm.write(f"    Found: {input_path.name}")
-                        self.converter_instance.copy_or_convert(input_path, output_path)
-                        if self.converter_instance.conversion_success:
-                            if self.converter_instance.is_mp4:
-                                tqdm.write(f" Original: {input_path}")
-                                tqdm.write(f"      New: {output_path}\n")
-                                file_path = output_path
-                                if input_path.exists():
-                                    input_path.unlink()
-                                    self.files_touched.append(output_path)
-                            else:
-                                tqdm.write(f"Original: {input_path}")
-                                tqdm.write("     New: Failed to convert.\n")
-                                if output_path.exists():
-                                    output_path.unlink()
-                        else:
-                            tqdm.write(f"Original: {input_path}")
-                            tqdm.write("     New: Failed to convert.\n")
-                            if output_path.exists():
-                                output_path.unlink()
-
+                        if input_path.exists():
+                            input_path.unlink()
+                            self.files_touched.append(output_path)
                     else:
-                        tqdm.write(" Dry run:")
                         tqdm.write(f"Original: {input_path}")
-                        tqdm.write(f"     New: {output_path}\n")
+                        tqdm.write("     New: Failed to convert.\n")
+                        if output_path.exists():
+                            output_path.unlink()
+                else:
+                    tqdm.write(f"Original: {input_path}")
+                    tqdm.write("     New: Failed to convert.\n")
+                    if output_path.exists():
+                        output_path.unlink()
 
-        if self.do_renames:
-            if self.do_renames_lowercase:
-                input_path = file_path
+            else:
+                tqdm.write(" Dry run:")
+                tqdm.write(f"Original: {input_path}")
+                tqdm.write(f"     New: {output_path}\n")
 
-                if input_path.name != input_path.name.lower():
-                    try:
-                        output_path = input_path.parent / input_path.name.lower()
-                        self.rename_file(input_path, output_path)
-                        if not self.is_dry_run:
-                            file_path = output_path
-                    except Exception as e:
-                        tqdm.write(input_path)
-                        tqdm.write(f"Error: {e}\n")
+    def _process_lowercase_filename(self, file_path):
+        if not self.do_renames_lowercase:
+            return
 
-            if self.do_remove_duplicate_extensions:
-                if self.has_duplicate_extensions(file_path):
-                    input_path = file_path
+        input_path = Path(file_path)
 
-                    output_name = self.remove_duplicate_extensions(input_path.name)
-                    output_path = input_path.parent / output_name
+        if input_path.name != input_path.name.lower():
+            output_path = input_path.parent / input_path.name.lower()
+            self.rename_file(input_path, output_path)
+            if not self.is_dry_run:
+                file_path = output_path
 
-                    if output_path != file_path:
-                        self.rename_file(input_path, output_path)
-                        if not self.is_dry_run:
-                            file_path = output_path
+    def _process_remove_duplicate_extensions(self, file_path):
+        if not self.do_remove_duplicate_extensions:
+            return
 
-            if not self.check_protected(file_path):
-                if self.do_sanitize_filenames:
-                    input_path = file_path
+        if not self.has_duplicate_extensions(file_path):
+            return
 
-                    file_name_sanitized = self.sanitize_filename(input_path)
-                    output_path = input_path.parent / file_name_sanitized
+        input_path = Path(file_path)
 
-                    if input_path != output_path:
-                        self.rename_file(input_path, output_path)
-                        if not self.is_dry_run:
-                            file_path = output_path
+        output_name = self.remove_duplicate_extensions(input_path.name)
+        output_path = input_path.parent / output_name
 
-        if self.do_imports:
-            if not self.check_protected(file_path):
-                if self.do_premium_imports:
-                    if self.is_premium_file(file_path):
-                        model_premium_dir = self.get_model_premium_dir(file_path)
+        if output_path != file_path:
+            self.rename_file(input_path, output_path)
+            if not self.is_dry_run:
+                file_path = output_path
 
-                        if model_premium_dir == file_path.parent:
-                            return
+    def _process_premium_file_imports(self, file_path):
+        if not self.do_premium_imports:
+            return
 
-                        if not self.is_dry_run:
-                            if not model_premium_dir.exists():
-                                model_premium_dir.mkdir()
+        if not self.is_premium_file(file_path):
+            return
 
-                        input_path = file_path
-                        output_path = model_premium_dir / file_path.name
+        if self.check_protected(file_path):
+            return
 
-                        self.rename_file(input_path, output_path)
-                        if not self.is_dry_run:
-                            file_path = output_path
+        model_premium_dir = self.get_model_premium_dir(file_path)
 
-            if self.do_loose_file_imports:
-                model_dir = self.get_model_name(file_path)
-                model_dir = self.root_dir / model_dir
+        if model_premium_dir == file_path.parent:
+            return
 
-                if model_dir == file_path.parent and any(
-                    file_path.suffix in filetypes
-                    for filetypes in self.valid_filetypes.values()
-                ):
-                    file_extension = file_path.suffix
-                    subfolder = None
+        if not self.is_dry_run:
+            if not model_premium_dir.exists():
+                model_premium_dir.mkdir()
 
-                    for key, filetypes in self.valid_filetypes.items():
-                        if file_extension in filetypes:
-                            subfolder = key
-                            break
+        input_path = Path(file_path)
+        output_path = model_premium_dir / file_path.name
 
-                    if subfolder is None:
-                        subfolder = "misc"
+        self.rename_file(input_path, output_path)
+        if not self.is_dry_run:
+            file_path = output_path
 
-                    subdir_path = model_dir / subfolder
+    def _process_loose_file_imports(self, file_path):
+        if not self.do_loose_file_imports:
+            return
 
-                    if not subdir_path.exists():
-                        if not self.is_dry_run:
-                            subdir_path.mkdir()
-                        else:
-                            tqdm.write(f"Would create {subdir_path}\n")
+        model_dir = self.get_model_name(file_path)
+        model_dir = self.root_dir / model_dir
 
-                    input_path = file_path
-                    output_path = subdir_path / file_path.name
+        if model_dir == file_path.parent and any(
+            file_path.suffix in filetypes for filetypes in self.valid_filetypes.values()
+        ):
+            file_extension = file_path.suffix
+            subfolder = None
 
-                    self.rename_file(input_path, output_path)
-                    if not self.is_dry_run:
-                        file_path = output_path
+            for key, filetypes in self.valid_filetypes.items():
+                if file_extension in filetypes:
+                    subfolder = key
+                    break
+
+            if subfolder is None:
+                subfolder = "misc"
+
+            subdir_path = model_dir / subfolder
+
+            if not subdir_path.exists():
+                if not self.is_dry_run:
+                    subdir_path.mkdir()
+                else:
+                    tqdm.write(f"Would create {subdir_path}\n")
+
+            input_path = Path(file_path)
+            output_path = subdir_path / file_path.name
+
+            self.rename_file(input_path, output_path)
+            if not self.is_dry_run:
+                file_path = output_path
+
+    def _process_need_to_converts(self, file_path):
+        file_path = Path(file_path)
 
         if (
             file_path.suffix.lower() in self.valid_filetypes["images"]
             and file_path.suffix.lower() not in self.goal_image_extension
+            and file_path.exists()
         ):
             self.images_to_convert.append(file_path)
 
         if (
             file_path.suffix.lower() in self.valid_filetypes["videos"]
             and file_path.suffix.lower() not in self.goal_video_extension
+            and file_path.exists()
         ):
             self.videos_to_convert.append(file_path)
 
-        relative_path = file_path.relative_to(self.root_dir)
-        key, value = (
-            str(relative_path.parts[0]),
-            f"{relative_path.parent.name}/{relative_path.name}",
-        )
+    def _process_add_to_result_dict(self, file_path):
+        file_path = Path(file_path)
 
-        if key in self.result_dict:
-            self.result_dict[key].append(value)
+        relative_path = file_path.relative_to(self.root_dir)
+        key = str(relative_path.parts[0])
+        list_type = str(relative_path.parent.name)
+        value = str(relative_path.name)
+
+        if key not in self.result_dict:
+            self.result_dict[key] = [{list_type: [value]}]
         else:
-            self.result_dict[key] = [value]
+            for item in self.result_dict[key]:
+                if list_type in item:
+                    item[list_type].append(value)
+                    break
+            else:
+                self.result_dict[key].append({list_type: [value]})
+
+    def process_file(self, file_path):
+        if self.do_converts:
+            self._process_image_converts(file_path)
+
+        if self.do_video_converts:
+            self._process_video_converts(file_path)
+
+        if self.do_renames:
+            self._process_lowercase_filename(file_path)
+            self._process_remove_duplicate_extensions(file_path)
+
+        if self.do_imports:
+            self._process_premium_file_imports(file_path)
+            self._process_loose_file_imports(file_path)
+
+        self._process_need_to_converts(file_path)
+
+        self._process_add_to_result_dict(file_path)
 
         self.file_count += 1
 
@@ -566,7 +608,7 @@ class FileProcessor:
         for entry in os.scandir(dir_path):
             if entry.is_dir():
                 skip_directory = False
-                for exclude_dir in self.exclude_dirs:
+                for exclude_dir in self.excluded_dirs:
                     if isinstance(exclude_dir, str):
                         if fnmatch.fnmatch(entry.name, exclude_dir):
                             skip_directory = True
@@ -583,7 +625,37 @@ class FileProcessor:
 
                 self.process_directory(entry.path, partial_func)
             if entry.is_file():
+                if ".part" in Path(entry).suffix:
+                    if self.is_debug:
+                        tqdm.write(f"Skipping {entry.path}\n")
+                    continue
                 partial_func(Path(entry.path))
+
+    def display_params(self):
+        attributes = vars(self)
+        exclude_keys = set(["ascii_art", "config", "exclude_dirs", "excluded_dirs"])
+
+        for key, value in attributes.items():
+            if key in exclude_keys:
+                continue
+
+            value_type = type(value).__name__
+
+            if (
+                (value_type in ["str", "bool", "WindowsPath"] and value)
+                or (value_type == "int" and value != 0)
+                or (value_type == "dict" and len(value) > 0)
+                or (value_type == "list" and len(value) > 0)
+            ):
+                if value_type == "list" and any(
+                    isinstance(item, WindowsPath) for item in value
+                ):
+                    value = [str(item).replace("\\", "/") for item in value]
+
+                print(f"{key}: {value} ({value_type})")
+
+        print()
+        input("Press Enter to continue...")
 
     def validate_path(self, path: Path, expect=None):
         if expect not in ["file", "dir"]:
@@ -770,7 +842,7 @@ class FileProcessor:
                         if output_path.is_file():
                             output_path.unlink()
                 except Exception as e:
-                    tqdm.write(input_path)
+                    tqdm.write("File:", input_path)
                     tqdm.write(
                         "Error occurred during conversion. Original file not deleted."
                     )
@@ -782,6 +854,7 @@ class FileProcessor:
                 tqdm.write(f"Original: {file_path}")
                 tqdm.write(f"     New: {output_path}\n")
         else:
+            tqdm.write("File:", file_path)
             tqdm.write("File is not a PNG or JFIF.\n")
             self.images_to_convert.append(file_path)
 
@@ -794,53 +867,6 @@ class FileProcessor:
         file_model = self.get_model_name(file_path)
         model_premium_dir = self.root_dir / file_model / self.premium_dir
         return model_premium_dir
-
-    def sanitize_filename(self, file_path: Path):
-        def remove_halfwidth_fullwidth_characters(filename):
-            return ftfy.fix_text(filename, normalization="NFKC")
-
-        def remove_emojis(filename):
-            return emoji.replace_emoji(filename, "")
-
-        def remove_invalid_characters(filename):
-            return ftfy.fix_text(filename)
-
-        def remove_capital_letters(filename):
-            if any(c.isupper() for c in filename):
-                return filename.lower()
-            else:
-                return filename
-
-        def remove_double_spaces(filename):
-            return re.sub(r"\s+", " ", filename)
-
-        def remove_trailing_characters(filename):
-            while len(filename) > 0:
-                if filename[-1] in [".", "_", "-"]:
-                    filename = filename[:-1]
-                else:
-                    break
-            return filename
-
-        def jpeg_to_jpg(filename):
-            if filename.suffix == ".jpeg":
-                return filename.with_suffix(".jpg")
-            return filename
-
-        filename = file_path.stem
-        filename = remove_halfwidth_fullwidth_characters(filename)
-        filename = remove_emojis(filename)
-        filename = remove_invalid_characters(filename)
-        if self.do_renames_lowercase:
-            filename = remove_capital_letters(filename)
-        filename = remove_double_spaces(filename)
-        filename = remove_trailing_characters(filename)
-        filename = sanitize(filename)
-        filename = file_path.parent / (filename + file_path.suffix)
-        sanitized_filename = filename
-        sanitized_filename = jpeg_to_jpg(filename)
-
-        return sanitized_filename
 
     def rename_file(self, input_path: Path, output_path: Path):
         input_path = Path(input_path)
@@ -892,13 +918,11 @@ class FileProcessor:
             tqdm.write(f"     New: {output_path}\n")
 
     def export_dict(self, output_path: Path, result_dict=None):
-        with open(output_path, "w") as f:
-            json.dump(
-                self.result_dict,
-                f,
-                indent=4,
-                default=lambda x: x.decode() if isinstance(x, bytes) else x,
-            )
+        with codecs.open(
+            output_path, "w", encoding="utf-8", errors="surrogateescape"
+        ) as f:
+            json.dump(self.result_dict, f, indent=4, ensure_ascii=False)
+            f.write("\n")
 
 
 def main():
@@ -906,7 +930,6 @@ def main():
     with CustomEnvironment():
         processor = FileProcessor(8)
         processor.crawl_root()
-        print()
 
 
 if __name__ == "__main__":

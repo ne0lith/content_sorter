@@ -1,4 +1,4 @@
-version: "0.2.1"
+version: "0.2.5"
 author: "ne0liberal"
 root_dir: "D:/Content/ISOs"
 completion_json: "D:/Content/index.json"
@@ -6,16 +6,16 @@ history_file: "D:/Content/history/history.json"
 premium_dir: "premium"
 is_dry_run: true
 is_debug: true
+show_params: false
 do_imports: true
 do_renames: true
 do_renames_lowercase: true
 do_converts: true
-do_sanitize_filenames: false
 do_remove_duplicate_extensions: true
 do_premium_imports: true
 do_loose_file_imports: true
 do_image_converts: true
-do_video_converts: false
+do_video_converts: false # we dont currently have a way to display progress for this, and sometimes it hangs
 do_import_coomer: true
 do_import_fanhouse: true
 do_import_fansly: true
@@ -86,7 +86,11 @@ protected_models:
   - "jessica nigri"
   - "meg turney"
 protected_dirs:
+  - "corrupted"
+  - "deepfakes"
+  - "favorites"
   - "premium"
+  - "youtube"
 ascii_art: |
 
     :::     ::: :::::::::: ::::    ::: :::    :::  ::::::::  

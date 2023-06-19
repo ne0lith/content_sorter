@@ -261,7 +261,7 @@ class VideoConverter:
 
 
 class FileProcessor:
-    def __init__(self, num_processes):
+    def __init__(self, num_processes) -> None:
         self.num_processes = num_processes
 
         self.config = Config()
@@ -294,7 +294,7 @@ class FileProcessor:
             self.output_launch_attributes()
             print()
 
-    def process_root(self):
+    def process_root(self) -> None:
         start_time = time.time()
 
         self.progress_bar = tqdm(
@@ -332,8 +332,9 @@ class FileProcessor:
 
         print()
         input("Press any key to exit...")
+        print()
 
-    def process_file(self, file_path):
+    def process_file(self, file_path) -> None:
         if self.do_converts:
             self._process_image_converts(file_path)
 
@@ -348,7 +349,7 @@ class FileProcessor:
             self._process_premium_file_imports(file_path)
             self._process_loose_file_imports(file_path)
 
-        self._process_need_to_converts(file_path)
+        self._process_conversion_leftovers(file_path)
 
         self._process_add_to_result_dict(file_path)
 
@@ -357,7 +358,7 @@ class FileProcessor:
         if self.file_count % self.update_interval == 0:
             self.progress_bar.update(self.update_interval)
 
-    def process_directory(self, dir_path, partial_func):
+    def process_directory(self, dir_path, partial_func) -> None:
         for entry in os.scandir(dir_path):
             if entry.is_dir():
                 skip_directory = False
@@ -381,14 +382,17 @@ class FileProcessor:
                         tqdm.write(f"Incorrect casing: {entry.path}\n")
 
                 self.process_directory(entry.path, partial_func)
+
             if entry.is_file():
                 if ".part" in Path(entry).suffix:
                     if self.is_debug:
                         tqdm.write(f"Skipping {entry.path}\n")
+
                     continue
+
                 partial_func(Path(entry.path))
 
-    def output_launch_attributes(self):
+    def output_launch_attributes(self) -> None:
         attributes = vars(self)
         exclude_keys = set(["ascii_art", "config", "exclude_dirs", "excluded_dirs"])
 
@@ -414,7 +418,7 @@ class FileProcessor:
         print()
         input("Press Enter to continue...")
 
-    def output_conversion_leftovers(self, items_to_convert, item_type):
+    def output_conversion_leftovers(self, items_to_convert, item_type) -> None:
         amount_string = (
             f"{item_type.capitalize()} to convert: ({len(items_to_convert)})"
         )
@@ -440,7 +444,7 @@ class FileProcessor:
             print(f"Extension: .{extension}")
             [print(item_path) for item_path in sorted_items if str(item_path) in items]
 
-    def _process_image_converts(self, file_path):
+    def _process_image_converts(self, file_path) -> None:
         if not self.do_image_converts:
             return
 
@@ -451,7 +455,7 @@ class FileProcessor:
             if not self.is_dry_run:
                 file_path = input_path.with_suffix(".jpg")
 
-    def _process_video_converts(self, file_path):
+    def _process_video_converts(self, file_path) -> None:
         if not self.do_video_converts:
             return
 
@@ -459,7 +463,7 @@ class FileProcessor:
         if input_path.suffix.lower() in self.convertable_video_extensions:
             self.convert_video_to_mp4(input_path)
 
-    def _process_lowercase_filename(self, file_path):
+    def _process_lowercase_filename(self, file_path) -> None:
         if not self.do_renames_lowercase:
             return
 
@@ -471,16 +475,16 @@ class FileProcessor:
             if not self.is_dry_run:
                 file_path = output_path
 
-    def _process_clean_duplicate_extensions(self, file_path):
+    def _process_clean_duplicate_extensions(self, file_path) -> None:
         if not self.do_clean_duplicate_extensions:
             return
 
-        if not self.has_duplicate_extensions(file_path):
+        if not self.is_duplicate_extensions(file_path):
             return
 
         input_path = Path(file_path)
 
-        output_name = self.clean_duplicate_extensions(input_path.name)
+        output_name = self.get_clean_duplicate_extensions(input_path.name)
         output_path = input_path.parent / output_name
 
         if output_path != file_path:
@@ -488,7 +492,7 @@ class FileProcessor:
             if not self.is_dry_run:
                 file_path = output_path
 
-    def _process_premium_file_imports(self, file_path):
+    def _process_premium_file_imports(self, file_path) -> None:
         if not self.do_premium_imports:
             return
 
@@ -514,7 +518,7 @@ class FileProcessor:
         if not self.is_dry_run:
             file_path = output_path
 
-    def _process_loose_file_imports(self, file_path):
+    def _process_loose_file_imports(self, file_path) -> None:
         if not self.do_loose_file_imports:
             return
 
@@ -550,7 +554,7 @@ class FileProcessor:
             if not self.is_dry_run:
                 file_path = output_path
 
-    def _process_need_to_converts(self, file_path):
+    def _process_conversion_leftovers(self, file_path) -> None:
         file_path = Path(file_path)
 
         if (
@@ -567,7 +571,7 @@ class FileProcessor:
         ):
             self.videos_to_convert.append(file_path)
 
-    def _process_add_to_result_dict(self, file_path):
+    def _process_add_to_result_dict(self, file_path) -> None:
         file_path = Path(file_path)
 
         relative_path = file_path.relative_to(self.root_dir)
@@ -585,9 +589,27 @@ class FileProcessor:
             else:
                 self.result_dict[key].append({list_type: [value]})
 
-    def is_valid_path(self, path: Path, expect=None):
-        if expect not in ["file", "dir"]:
-            tqdm.write(f"Invalid expect value: {expect}. Must be 'file' or 'dir'")
+    def is_empty_directory(self, path: Path) -> bool:
+        path = Path(path)
+
+        if not self.is_valid_path(path, expect="directory"):
+            raise ValueError("Invalid directory path")
+
+        if any(item.is_file() for item in path.iterdir()):
+            return False
+
+        for item in path.iterdir():
+            if item.is_dir():
+                if not self.is_empty_directory(item):
+                    return False
+
+        return True
+
+    def is_valid_path(self, path: Path, expect=None) -> bool:
+        path = Path(path)
+
+        if expect not in ["file", "directory"]:
+            tqdm.write(f"Invalid expect value: {expect}. Must be 'file' or 'directory'")
             return False
 
         if not path.exists():
@@ -595,12 +617,12 @@ class FileProcessor:
 
         if expect == "file":
             return path.is_file()
-        elif expect == "dir":
+        elif expect == "directory":
             return path.is_dir()
 
         return False
 
-    def is_social_media(self, file_path: Path):
+    def is_social_media(self, file_path: Path) -> bool:
         def is_instagram_or_twitter_file(file_path: Path):
             protected_suffixes = [".jpg", ".jpeg", ".mp4"]
             instagram_twitter_file_pattern = re.compile(
@@ -616,29 +638,29 @@ class FileProcessor:
 
         return is_instagram_or_twitter_file(file_path)
 
-    def is_premium_file(self, file_path: Path):
-        def is_coomer_file(file_path):
+    def is_premium_file(self, file_path: Path) -> bool:
+        def is_coomer_file(file_path) -> bool:
             pattern = r"^[a-fA-F0-9]{64}$"
             return bool(re.match(pattern, file_path.stem))
 
-        def is_fanhouse_file(file_path):
+        def is_fanhouse_file(file_path) -> bool:
             return "fanhouse" in file_path.stem.lower()
 
-        def is_fansly_file(file_path):
+        def is_fansly_file(file_path) -> bool:
             return "fansly" in file_path.stem.lower()
 
-        def is_gumroad_file(file_path):
+        def is_gumroad_file(file_path) -> bool:
             return "gumroad" in file_path.stem.lower()
 
-        def is_onlyfans_file(file_path):
-            def is_image(file_path):
+        def is_onlyfans_file(file_path) -> bool:
+            def is_image(file_path) -> bool:
                 pattern = r"\d+x\d+_[a-z0-9]{32}"
                 return (
                     re.search(pattern, file_path.stem)
                     and file_path.suffix.lower() in self.valid_filetypes["images"]
                 )
 
-            def is_video(file_path):
+            def is_video(file_path) -> bool:
                 pattern = r"[a-z0-9]{21}(_source|_480p|_720p|_1080p)"
                 return (
                     re.search(pattern, file_path.stem)
@@ -651,10 +673,10 @@ class FileProcessor:
                 or "onlyfans" in file_path.stem.lower()
             )
 
-        def is_patreon_file(file_path):
+        def is_patreon_file(file_path) -> bool:
             return "patreon" in file_path.stem.lower()
 
-        def is_ppv_file(file_path):
+        def is_ppv_file(file_path) -> bool:
             pattern = r"pay[\s_-]*per[\s_-]*view"
             optional_patterns = ["ppv"]
 
@@ -672,6 +694,24 @@ class FileProcessor:
             or (self.do_import_patreon and is_patreon_file(file_path))
             or (self.do_import_ppv and is_ppv_file(file_path))
         )
+
+    def is_duplicate_extensions(self, file_path: Path) -> bool:
+        file_path = Path(file_path)
+
+        file_name = file_path.name
+
+        parts = file_name.split(".")
+        file_stem = ".".join(parts[:-1])
+
+        self.possible_extensions = (
+            self.valid_filetypes["videos"] + self.valid_filetypes["images"]
+        )
+
+        for ext in self.possible_extensions:
+            if ext in file_stem:
+                return True
+
+        return False
 
     def get_unique_file_path(self, file_path: Path) -> Path:
         file_name = file_path.stem.lower()
@@ -691,6 +731,26 @@ class FileProcessor:
 
         return unique_file_path
 
+    def get_clean_duplicate_extensions(self, file_path: Path) -> str:
+        file_path = Path(file_path)
+
+        file_name = file_path.name
+
+        parts = file_name.split(".")
+        actual_ext = parts[-1]
+        output_name = ".".join(parts[:-1])
+
+        for ext in self.possible_extensions:
+            if ext in output_name:
+                output_name = output_name.replace(ext, "")
+
+        output_name = f"{output_name}.{actual_ext}"
+
+        if file_name == output_name:
+            return file_name
+
+        return output_name
+
     def get_model_name_from_file_path(self, file_path: Path) -> str:
         file_model = file_path.parts[file_path.parts.index(self.root_dir.parts[-1]) + 1]
 
@@ -699,27 +759,29 @@ class FileProcessor:
     def get_model_premium_directory(self, file_path: Path) -> Path:
         file_model = self.get_model_name_from_file_path(file_path)
         model_premium_directory = self.root_dir / file_model / self.premium_directory
+
         return model_premium_directory
 
-    def get_ascii_art(self):
+    def get_ascii_art(self) -> str:
         ascii_block = """
     :::     ::: :::::::::: ::::    ::: :::    :::  ::::::::  
     :+:     :+: :+:        :+:+:   :+: :+:    :+: :+:    :+: 
     +:+     +:+ +:+        :+:+:+  +:+ +:+    +:+ +:+        
     +#+     +:+ +#++:++#   +#+ +:+ +#+ +#+    +:+ +#++:++#++ 
-    +#+   +#+  +#+        +#+  +#+#+# +#+    +#+        +#+ 
-    #+#+#+#+#+   #+#        #+#   #+#+# #+#    #+# #+#    #+# 
+    +#+     +#+ +#+        +#+  +#+#+# +#+    +#+        +#+ 
+     +#+#+#+#+  #+#        #+#   #+#+# #+#    #+# #+#    #+# 
         ###     ########## ###    ####  ########   ########  
-    :::::::::::: ::::    ::::  :::::::::   ::::::::  :::::::::  ::::::::::: :::::::::: :::::::::  
-        :+:     +:+:+: :+:+:+ :+:    :+: :+:    :+: :+:    :+:     :+:     :+:        :+:    :+: 
-        +:+     +:+ +:+:+ +:+ +:+    +:+ +:+    +:+ +:+    +:+     +:+     +:+        +:+    +:+ 
-        +#+     +#+  +:+  +#+ +#++:++#+  +#+    +:+ +#++:++#:      +#+     +#++:++#   +#++:++#:  
-        +#+     +#+       +#+ +#+        +#+    +#+ +#+    +#+     +#+     +#+        +#+    +#+ 
-        #+#     #+#       #+# #+#        #+#    #+# #+#    #+#     #+#     #+#        #+#    #+# 
-    ########### ###       ### ###         ########  ###    ###     ###     ########## ###    ###"""
+    :::::::::::: ::::    ::::  :::::::::   ::::::::  ::::::::: ::::::::::: :::::::::: :::::::::  
+        :+:     +:+:+: :+:+:+ :+:    :+: :+:    :+: :+:    :+:    :+:     :+:        :+:    :+: 
+        +:+     +:+ +:+:+ +:+ +:+    +:+ +:+    +:+ +:+    +:+    +:+     +:+        +:+    +:+ 
+        +#+     +#+  +:+  +#+ +#++:++#+  +#+    +:+ +#++:++#:     +#+     +#++:++#   +#++:++#:  
+        +#+     +#+       +#+ +#+        +#+    +#+ +#+    +#+    +#+     +#+        +#+    +#+ 
+        #+#     #+#       #+# #+#        #+#    #+# #+#    #+#    #+#     #+#        #+#    #+# 
+    ########### ###       ### ###         ########  ###    ###    ###     ########## ###    ###"""
+
         return ascii_block
 
-    def convert_video_to_mp4(self, file_path: Path):
+    def convert_video_to_mp4(self, file_path: Path) -> None:
         file_path = Path(file_path)
 
         input_path = file_path
@@ -766,7 +828,7 @@ class FileProcessor:
             tqdm.write(f"Original: {input_path}")
             tqdm.write(f"     New: {output_path}\n")
 
-    def convert_image_to_jpg(self, file_path: Path):
+    def convert_image_to_jpg(self, file_path: Path) -> None:
         file_path = Path(file_path)
 
         if "jpeg" in file_path.suffix.lower():
@@ -817,45 +879,7 @@ class FileProcessor:
             tqdm.write("File is not a PNG or JFIF.\n")
             self.images_to_convert.append(file_path)
 
-    def has_duplicate_extensions(self, file_path: Path):
-        file_path = Path(file_path)
-
-        file_name = file_path.name
-
-        parts = file_name.split(".")
-        file_stem = ".".join(parts[:-1])
-
-        self.possible_extensions = (
-            self.valid_filetypes["videos"] + self.valid_filetypes["images"]
-        )
-
-        for ext in self.possible_extensions:
-            if ext in file_stem:
-                return True
-
-        return False
-
-    def clean_duplicate_extensions(self, file_path: Path):
-        file_path = Path(file_path)
-
-        file_name = file_path.name
-
-        parts = file_name.split(".")
-        actual_ext = parts[-1]
-        output_name = ".".join(parts[:-1])
-
-        for ext in self.possible_extensions:
-            if ext in output_name:
-                output_name = output_name.replace(ext, "")
-
-        output_name = f"{output_name}.{actual_ext}"
-
-        if file_name == output_name:
-            return file_name
-
-        return output_name
-
-    def rename_file(self, input_path: Path, output_path: Path):
+    def rename_file(self, input_path: Path, output_path: Path) -> None:
         input_path = Path(input_path)
         output_path = Path(output_path)
 
@@ -904,7 +928,7 @@ class FileProcessor:
             tqdm.write(f"Original: {input_path}")
             tqdm.write(f"     New: {output_path}\n")
 
-    def export_result_dict(self, output_path: Path, result_dict=None):
+    def export_result_dict(self, output_path: Path, result_dict=None) -> None:
         with codecs.open(
             output_path, "w", encoding="utf-8", errors="surrogateescape"
         ) as f:

@@ -1,0 +1,128 @@
+; dont try to use this
+; this is the template of the future iteration of this
+
+version: 0.3.0
+author: ne0liberal
+
+paths:
+  root_dir: D:/Content/ISOs
+  completion_json: D:/Content/index.json
+  history_file: D:/Content/history/history.json
+  premium_directory: premium
+
+debug_settings:
+  output_attributes: false
+  is_dry_run: false
+  is_debug: false
+
+conversion_options:
+  do_converts: true
+  do_images: true
+  do_videos: true
+
+  goal_video_extensions:
+    - .mp4
+    - .webm
+    - .gif
+
+  convertable_video_extensions:
+    - .avi
+    - .m4v
+    - .mkv
+    - .mov
+    - .mpeg
+    - .ts
+    - .wmv
+    - .vid
+
+  goal_image_extensions:
+    - .jpg
+    - .webp
+
+  convertable_image_extensions:
+    - .jfif
+    - .jpeg
+    - .png
+
+rename_options:
+  do_renames: true 
+  do_lowercase: true
+  do_duplicate_extensions: true
+
+import_options:
+  do_imports: true
+  do_premium: true
+  do_loose_files: true
+
+import_fan_platforms:
+  do_coomer: true
+  do_fanhouse: true
+  do_fansly: true
+  do_gumroad: true
+  do_onlyfans: true
+  do_patreon: true
+  do_ppv: true
+
+excluded_directories:
+  models:
+    - darshelle stevens
+    - jessica nigri
+    - meg turney
+
+  general:
+    - deepfakes
+    - favorites
+    - premium
+
+filetypes:
+  valid_filetypes:
+    audio:
+      - .mp3
+      - .wav
+      - .flac
+      - .m4a
+      - .aac
+      - .ogg
+    images:
+      - .jpg
+      - .jpeg
+      - .png
+      - .bmp
+      - .tiff
+      - .webp
+      - .jfif
+    text:
+      - .txt
+      - .doc
+      - .docx
+      - .pdf
+      - .rtf
+    misc:
+      - .zip
+      - .rar
+      - .7z
+      - .torrent
+      - .heic
+      - .log
+      - .db
+      - .htm
+      - .html
+      - .bat
+      - .py
+      - .db-journal
+      - .ini
+      - .psd
+      - .time
+    videos:
+      - .mp4
+      - .mkv
+      - .mov
+      - .m4v
+      - .wmv
+      - .webm
+      - .gif
+      - .avi
+      - .ts
+      - .mpg
+      - .flv
+      - .mpeg

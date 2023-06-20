@@ -141,12 +141,9 @@ class VideoConverter:
             while process.poll() is None:
                 elapsed_time = time.time() - start_time
                 if elapsed_time > timeout:
-                    # Conversion took longer than the timeout of 45 seconds
-                    # Forcefully terminate the process
                     process.terminate()
                     process.wait()
 
-                    # Mark as failed
                     conversion_success = False
                     is_mp4 = False
                     return
@@ -158,16 +155,11 @@ class VideoConverter:
                 conversion_success = False
                 is_mp4 = False
 
-        # Create a thread for running the conversion
         thread = threading.Thread(target=conversion_thread)
 
-        # Start the thread
         thread.start()
-
-        # Wait for the thread to complete
         thread.join()
 
-        # Update instance variables
         self.conversion_success = conversion_success
         self.is_mp4 = is_mp4
 

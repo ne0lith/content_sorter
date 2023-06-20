@@ -11,6 +11,7 @@ import fnmatch
 import platform
 import datetime
 import builtins
+import threading
 import traceback
 from PIL import Image
 from tqdm import tqdm
@@ -123,9 +124,55 @@ class VideoConverter:
         self.conversion_success = False
         self.is_mp4 = False
 
+    def run_conversion(self, cmd, output_file):
+        import subprocess
+
+        conversion_success = False
+        is_mp4 = False
+        timeout = 45
+        start_time = time.time()
+
+        def conversion_thread():
+            nonlocal conversion_success, is_mp4
+            process = subprocess.Popen(
+                cmd, stderr=subprocess.PIPE, universal_newlines=True
+            )
+
+            while process.poll() is None:
+                elapsed_time = time.time() - start_time
+                if elapsed_time > timeout:
+                    # Conversion took longer than the timeout of 45 seconds
+                    # Forcefully terminate the process
+                    process.terminate()
+                    process.wait()
+
+                    # Mark as failed
+                    conversion_success = False
+                    is_mp4 = False
+                    return
+
+            if process.returncode == 0 and self.is_valid_mp4(output_file):
+                conversion_success = True
+                is_mp4 = True
+            else:
+                conversion_success = False
+                is_mp4 = False
+
+        # Create a thread for running the conversion
+        thread = threading.Thread(target=conversion_thread)
+
+        # Start the thread
+        thread.start()
+
+        # Wait for the thread to complete
+        thread.join()
+
+        # Update instance variables
+        self.conversion_success = conversion_success
+        self.is_mp4 = is_mp4
+
     def copy(self, input_file, output_file):
         import ffmpeg
-        import subprocess
 
         try:
             input_stream = ffmpeg.input(str(input_file))
@@ -133,21 +180,7 @@ class VideoConverter:
                 input_stream, str(output_file), vcodec="copy", acodec="copy"
             )
             cmd = ffmpeg.compile(output_stream, overwrite_output=True)
-            with subprocess.Popen(
-                cmd, stderr=subprocess.PIPE, universal_newlines=True
-            ) as p:  # noqa F841
-                while True:
-                    total_time = 0
-                    tqdm.write(f"           {total_time}", end="\r")
-                    time.sleep(0.5)
-                    total_time += 0.5
-                    if self.is_valid_mp4(output_file):
-                        self.conversion_success = True
-                        self.is_mp4 = True
-                        break
-                    else:
-                        self.conversion_success = False
-                        self.is_mp4 = False
+            self.run_conversion(cmd, output_file)
 
         except ffmpeg.Error as e:
             tqdm.write(f"An error occurred during video copying of {input_file}")
@@ -157,7 +190,6 @@ class VideoConverter:
 
     def convert(self, input_file, output_file):
         import ffmpeg
-        import subprocess
 
         try:
             input_stream = ffmpeg.input(str(input_file))
@@ -167,21 +199,7 @@ class VideoConverter:
                 **self.get_output_codec_options(input_file),
             )
             cmd = ffmpeg.compile(output_stream, overwrite_output=True)
-            with subprocess.Popen(
-                cmd, stderr=subprocess.PIPE, universal_newlines=True
-            ) as p:  # noqa F841
-                while True:
-                    total_time = 0
-                    tqdm.write(f"           {total_time}", end="\r")
-                    time.sleep(0.5)
-                    total_time += 0.5
-                    if self.is_valid_mp4(output_file):
-                        self.conversion_success = True
-                        self.is_mp4 = True
-                        break
-                    else:
-                        self.conversion_success = False
-                        self.is_mp4 = False
+            self.run_conversion(cmd, output_file)
 
         except ffmpeg.Error as e:
             tqdm.write(f"An error occurred during video conversion of {input_file}")
@@ -272,6 +290,7 @@ class FileProcessor:
 
         if self.do_video_converts:
             self.converter_instance = VideoConverter()
+            self.blacklisted_files = [Path(item) for item in self.blacklisted_files]
 
         self.progress_bar = None
         self.file_count = 0
@@ -424,6 +443,7 @@ class FileProcessor:
         )
         print(amount_string)
         print("-" * len(amount_string))
+
         items_by_extension = {}
         for item in items_to_convert:
             item_path = str(item)
@@ -444,6 +464,58 @@ class FileProcessor:
             print(f"Extension: .{extension}")
             [print(item_path) for item_path in sorted_items if str(item_path) in items]
 
+    def _process_broken_file_dates(self, file_path) -> None:
+        # you can delete this
+        # this was used so i could fix broken file dates for
+        # darshelle stevens, jessica nigri, and meg turney
+        # i curate the sets by month and year
+        # and i used that to fix the file dates for the sets
+        # some were set to 2097, and some didnt match the folder name
+
+        def contains_month_year(file_path):
+            folder_path = Path(file_path).parent
+            folder_name = folder_path.name
+            match = re.search(r"\((\w+)\) \((\d{4})\)", folder_name)
+            return bool(match)
+
+        def extract_month_year(file_path):
+            month, year = None, None
+            folder_path = Path(file_path).parent
+            folder_name = folder_path.name
+            match = re.search(r"\((\w+)\) \((\d{4})\)", folder_name)
+            if match:
+                month, year = match.group(1), match.group(2)
+            return month, year
+
+        def modify_file_dates(file_path):
+            file_path = Path(file_path)
+            if not file_path.exists():
+                return
+
+            if not contains_month_year(file_path):
+                return
+
+            month, year = extract_month_year(file_path)
+
+            try:
+                month_number = datetime.datetime.strptime(month, "%B").month
+            except ValueError:
+                return
+
+            new_date = datetime.datetime(int(year), month_number, 1)
+
+            try:
+                if not self.is_dry_run:
+                    file_path.touch()
+                    os.utime(file_path, (new_date.timestamp(), new_date.timestamp()))
+                    tqdm.write(f"Modified dates of '{file_path}' to {new_date}.\n")
+                else:
+                    tqdm.write(f"Would modify dates of '{file_path}' to {new_date}.\n")
+            except Exception as e:
+                tqdm.write(f"Failed to modify dates for '{file_path}':\n{str(e)}\n")
+
+        modify_file_dates(file_path)
+
     def _process_image_converts(self, file_path) -> None:
         if not self.do_image_converts:
             return
@@ -459,7 +531,11 @@ class FileProcessor:
         if not self.do_video_converts:
             return
 
+        if Path(file_path) in self.blacklisted_files:
+            return
+
         input_path = Path(file_path)
+
         if input_path.suffix.lower() in self.convertable_video_extensions:
             self.convert_video_to_mp4(input_path)
 
@@ -588,22 +664,6 @@ class FileProcessor:
                     break
             else:
                 self.result_dict[key].append({list_type: [value]})
-
-    def is_empty_directory(self, path: Path) -> bool:
-        path = Path(path)
-
-        if not self.is_valid_path(path, expect="directory"):
-            raise ValueError("Invalid directory path")
-
-        if any(item.is_file() for item in path.iterdir()):
-            return False
-
-        for item in path.iterdir():
-            if item.is_dir():
-                if not self.is_empty_directory(item):
-                    return False
-
-        return True
 
     def is_valid_path(self, path: Path, expect=None) -> bool:
         path = Path(path)
@@ -771,7 +831,7 @@ class FileProcessor:
     +#+     +#+ +#+        +#+  +#+#+# +#+    +#+        +#+ 
      +#+#+#+#+  #+#        #+#   #+#+# #+#    #+# #+#    #+# 
         ###     ########## ###    ####  ########   ########  
-    :::::::::::: ::::    ::::  :::::::::   ::::::::  ::::::::: ::::::::::: :::::::::: :::::::::  
+    ::::::::::: ::::     :::: :::::::::   ::::::::  ::::::::: ::::::::::: :::::::::: :::::::::  
         :+:     +:+:+: :+:+:+ :+:    :+: :+:    :+: :+:    :+:    :+:     :+:        :+:    :+: 
         +:+     +:+ +:+:+ +:+ +:+    +:+ +:+    +:+ +:+    +:+    +:+     +:+        +:+    +:+ 
         +#+     +#+  +:+  +#+ +#++:++#+  +#+    +:+ +#++:++#:     +#+     +#++:++#   +#++:++#:  
@@ -803,7 +863,9 @@ class FileProcessor:
 
         if not self.is_dry_run:
             tqdm.write(f"    Found: {input_path.name}")
+
             self.converter_instance.copy_or_convert(input_path, output_path)
+
             if self.converter_instance.conversion_success:
                 if self.converter_instance.is_mp4:
                     tqdm.write(f" Original: {input_path}")
@@ -838,6 +900,11 @@ class FileProcessor:
 
         if file_path.suffix.lower() in [".png", ".jfif"]:
             file_path = Path(file_path)
+
+            input_path = file_path
+            output_path = file_path.with_suffix(".jpg")
+            output_path = self.get_unique_file_path(output_path)
+
             if not self.is_dry_run:
                 try:
                     image = Image.open(file_path)
@@ -845,9 +912,6 @@ class FileProcessor:
                     if image.mode in ["RGBA", "P"]:
                         image = image.convert("RGB")
 
-                    input_path = file_path
-                    output_path = file_path.with_suffix(".jpg")
-                    output_path = self.get_unique_file_path(output_path)
                     image.save(output_path, "JPEG", quality=100)
 
                     if output_path.is_file() and output_path.stat().st_size > 0:
@@ -889,7 +953,8 @@ class FileProcessor:
         output_path = output_path.parent / output_path.name.lower()
 
         if not self.is_valid_path(input_path, expect="file"):
-            tqdm.write(f"Invalid file path: {input_path}\n")
+            if self.is_debug:
+                tqdm.write(f"Invalid file path: {input_path}\n")
             return
 
         if not self.is_dry_run:

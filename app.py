@@ -7,6 +7,7 @@ import uuid
 import yaml
 import shutil
 import codecs
+import signal
 import fnmatch
 import platform
 import datetime
@@ -22,6 +23,9 @@ from pathlib import Path, WindowsPath
 
 class CustomEnvironment:
     def __init__(self):
+        # backup and replace the print, input, and tqdm.write builtins
+        # hide the cursor with "\033[?25l"
+
         self.original_print = builtins.print
         self.original_input = builtins.input
         self.original_write = tqdm.write
@@ -32,28 +36,65 @@ class CustomEnvironment:
         tqdm.write = self.custom_write
 
     def __enter__(self):
+        # replace the excepthook with a custom one
+        # replace the SIGINT handler with a custom one
+        # return self so that the instance can be used as a context manager
+
+        self.original_excepthook = sys.excepthook
+        sys.excepthook = self.custom_excepthook
+        signal.signal(signal.SIGINT, self.exit_gracefully)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # undo what was done in __enter__
+
         self.restore()
+        sys.excepthook = self.original_excepthook
 
     def custom_print(self, *args, **kwargs):
+        # add 4 spaces to the beginning of each line of output from print
+
         modified_args = ("    " + str(arg) for arg in args)
         self.original_print(*modified_args, **kwargs)
 
     def custom_input(self, prompt=""):
+        # add 4 spaces to the beginning of the prompt for input
+
         modified_prompt = "    " + str(prompt)
         return self.original_input(modified_prompt)
 
     def custom_write(self, s, *args, **kwargs):
+        # add 4 spaces to the beginning of each line of output from tqdm.write
+
         modified_s = "    " + str(s)
         self.original_write(modified_s, *args, **kwargs)
 
+    def exit_gracefully(self, signum, frame):
+        # exit gracefully when SIGINT is received
+        # this is so we can ctrl+c from anywhere in the program
+
+        print("Exiting gracefully...")
+        sys.exit(0)
+
     def restore(self):
+        # restore the original print, input, and tqdm.write builtins
+        # reenable the cursor with "\033[?25h"
+
         builtins.print = self.original_print
         builtins.input = self.original_input
         tqdm.write = self.original_write
         sys.stdout.write("\033[?25h")
+
+    def custom_excepthook(self, exc_type, exc_val, exc_tb):
+        # custom excepthook to print a custom traceback
+        # for uncaught exceptions
+
+        custom_traceback = "Error occurred:\n"
+        custom_traceback += f"Type: {exc_type}\n"
+        custom_traceback += f"Value: {exc_val}\n"
+        custom_traceback += f"Traceback: {exc_tb}\n"
+
+        tqdm.write(custom_traceback)
 
 
 class Config:
